@@ -105,11 +105,6 @@ namespace GnossServicioModuloBASE
                             ProcesarFilasDeColaDePaginasCMS(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
                             servicesUtilVirtuosoAndReplication.ConexionAfinidad = "";
                         }
-                        else
-                        {
-                            //se limpia las metas de las ontologías
-                            mDicOntologiaMetas = null;
-                        }
                     }
                     catch (OperationCanceledException)
                     {

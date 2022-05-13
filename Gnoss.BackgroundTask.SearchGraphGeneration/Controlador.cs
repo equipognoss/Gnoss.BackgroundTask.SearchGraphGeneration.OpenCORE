@@ -103,11 +103,6 @@ namespace GnossServicioModuloBASE
         protected Dictionary<Guid, string> mDicUrlMappingProyecto;
 
         /// <summary>
-        /// Contiene las metaetiquetas definidas por ontología
-        /// </summary>
-        protected Dictionary<Guid, List<MetaKeyword>> mDicOntologiaMetas;
-
-        /// <summary>
         /// Sirve para escribir en ficheros externos las triples o no.
         /// </summary>
         protected bool mEscribirFicheroExternoTriples;
@@ -770,7 +765,7 @@ namespace GnossServicioModuloBASE
             }
 
             ParametroAplicacion filaParametro = GestorParametroAplicacionDS.ParametroAplicacion.Find(parametroApp => parametroApp.Parametro.Equals(TiposParametrosAplicacion.GenerarGrafoContribuciones));
-            bool generarGrafoContribuciones = (filaParametro == null || filaParametro.Equals("1"));
+            bool generarGrafoContribuciones = (filaParametro == null || filaParametro.Valor.Equals("1"));
 
             if (mTripletasPerfilOrganizacion.Length > 0)
             {
@@ -2073,33 +2068,41 @@ namespace GnossServicioModuloBASE
                                             {
                                                 mensaje += $"\r\n UrlServicioArchivos: {filasConfigServicios[0].NumServicio}: {filasConfigServicios[0].Url}";
                                             }
-                                            this.GuardarLog($"ALERT: {mensaje}", loggingService);
+                                            GuardarLog($"ALERT: {mensaje}", loggingService);
                                         }
+
+                                        Dictionary<Guid, List<MetaKeyword>> dicOntologiaMetas = new Dictionary<Guid, List<MetaKeyword>>();
 
                                         //se cargan las metaetiquetas del xml de la ontología al campo search
                                         if (!string.IsNullOrEmpty(urlServicioArchivos) && uriValida)
                                         {
-                                            if (filaDocumento.ElementoVinculadoID.HasValue && (mDicOntologiaMetas == null || !mDicOntologiaMetas.ContainsKey(filaDocumento.ElementoVinculadoID.Value)))
+                                            if (filaDocumento.ElementoVinculadoID.HasValue)
                                             {
                                                 string result = CallWebMethods.CallGetApi(urlServicioArchivos, $"ObtenerXmlOntologia?pOntologiaID={filaDocumento.ElementoVinculadoID.Value}");
                                                 byte[] byteArray = JsonConvert.DeserializeObject<byte[]>(result);
 
                                                 if (byteArray != null)
                                                 {
-                                                    if (mDicOntologiaMetas == null)
-                                                    {
-                                                        mDicOntologiaMetas = new Dictionary<Guid, List<MetaKeyword>>();
-                                                    }
-
-                                                    UtilidadesFormulariosSemanticos.ObtenerMetaEtiquetasXMLOntologia(byteArray, mDicOntologiaMetas, filaDocumento.ElementoVinculadoID.Value);
+                                                    UtilidadesFormulariosSemanticos.ObtenerMetaEtiquetasXMLOntologia(byteArray, dicOntologiaMetas, filaDocumento.ElementoVinculadoID.Value);
                                                 }
                                             }
-
-                                            if (filaDocumento.ElementoVinculadoID.HasValue && (mDicOntologiaMetas != null && mDicOntologiaMetas.ContainsKey(filaDocumento.ElementoVinculadoID.Value)))
+                                            string subtipo = "";
+                                            foreach (string triple in triples.Split(new[] { " ." }, StringSplitOptions.RemoveEmptyEntries))
                                             {
-                                                foreach (MetaKeyword metaTags in mDicOntologiaMetas[filaDocumento.ElementoVinculadoID.Value])
+                                                if (triple.Contains("<http://gnoss/type>"))
                                                 {
-                                                    valorSearch += $" {metaTags.Content}";
+                                                    subtipo = triple.Substring(triple.LastIndexOf(">")).Replace(">", "").Replace("\"", "").Trim();
+                                                    break;
+                                                }
+                                            }
+                                            if (filaDocumento.ElementoVinculadoID.HasValue && (dicOntologiaMetas != null && dicOntologiaMetas.ContainsKey(filaDocumento.ElementoVinculadoID.Value)))
+                                            {
+                                                foreach (MetaKeyword metaTags in dicOntologiaMetas[filaDocumento.ElementoVinculadoID.Value])
+                                                {
+                                                    if (string.IsNullOrEmpty(metaTags.EntidadID) || metaTags.EntidadID.Equals(subtipo))
+                                                    {
+                                                        valorSearch += $" {metaTags.Content}";
+                                                    }
                                                 }
                                             }
                                         }
@@ -3245,7 +3248,7 @@ namespace GnossServicioModuloBASE
                     //ParametroAplicacionDS.ParametroAplicacionRow filaParametro = ParametroAplicacionDS.ParametroAplicacion.FindByParametro(TiposParametrosAplicacion.GenerarGrafoContribuciones);
                     ParametroAplicacion filaParametro = GestorParametroAplicacionDS.ParametroAplicacion.Find(parametroApp => parametroApp.Parametro.Equals(TiposParametrosAplicacion.GenerarGrafoContribuciones));
 
-                    bool generarGrafoContribuciones = (filaParametro == null || filaParametro.Equals("1"));
+                    bool generarGrafoContribuciones = (filaParametro == null || filaParametro.Valor.Equals("1"));
 
                     if (generarGrafoContribuciones)
                     {

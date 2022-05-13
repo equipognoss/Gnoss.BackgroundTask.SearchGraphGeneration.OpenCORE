@@ -141,13 +141,6 @@ namespace GnossServicioModuloBASE
                                 this.GuardarLog("Ha habido errores en el mantenimiento.", loggingService);
                             }
                         }
-                        else
-                        {
-                            //se limpia las metas de las ontologías
-                            mDicOntologiaMetas = null;
-
-                            //this.GuardarLog("No hay peticiones pendientes.");
-                        }
                     }
                     catch (OperationCanceledException)
                     {
