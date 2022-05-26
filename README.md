@@ -1,1 +1,38 @@
-# Gnoss.BackgroundTask.SearchGraphGeneration.Open
+# Gnoss.BackgroundTask.SearchGraphGeneration.OpenCORE
+
+Aplicación de segundo plano que se encarga de insertar en el grafo de búsqueda los triples de cada elemento que se cree en la comunidad (recurso, persona, etc).
+
+Configuración estandar de esta aplicación en el archivo docker-compose.yml: 
+
+```yml
+searchgraphgeneration:
+    image: searchgraphgeneration
+    env_file: .env
+    environment:
+     virtuosoConnectionString: ${virtuosoConnectionString}
+     acid: ${acid}
+     base: ${base}
+     RabbitMQ__colaReplicacion: ${RabbitMQ}
+     RabbitMQ__colaServiciosWin: ${RabbitMQ}
+     Virtuoso__Escritura__VirtuosoLecturaPruebasGnoss_v3: "HOST=192.152.3.24:1111;UID=admin;PWD=admin123;Pooling=true;Max Pool Size=10;Connection Lifetime=15000"
+     Virtuoso__Escritura__VirtuosoLecturaPruebasGnoss_v4: "HOST=192.152.3.22:1111;UID=admin;PWD=admin123;Pooling=true;Max Pool Size=10;Connection Lifetime=15000"
+     BidirectionalReplication__VirtuosoLecturaPruebasGnoss_v3: "VirtuosoLecturaPruebasGnoss_v4"
+     BidirectionalReplication__VirtuosoLecturaPruebasGnoss_v4: "VirtuosoLecturaPruebasGnoss_v3"
+     redis__redis__ip__master: ${redis__redis__ip__master}
+     redis__redis__bd: ${redis__redis__bd}
+     redis__redis__timeout: ${redis__redis__timeout}
+     redis__recursos__ip__master: ${redis__recursos__ip__master}
+     redis__recursos__bd: ${redis__recursos_bd}
+     redis__recursos__timeout: ${redis__recursos_timeout}
+     redis__liveUsuarios__ip__master: ${redis__liveUsuarios__ip__master}
+     redis__liveUsuarios__bd: ${redis__liveUsuarios_bd}
+     redis__liveUsuarios__timeout: ${redis__liveUsuarios_timeout}
+     idiomas: "es|Español,en|English"
+     Servicios__urlBase: "https://servicios.test.com"
+     connectionType: "0"
+     intervalo: "100"
+    volumes:
+     - ./logs/base:/app/logs
+```
+
+Se pueden consultar los posibles valores de configuración de cada parámetro aquí: https://github.com/equipognoss/Gnoss.Platform.Deploy
