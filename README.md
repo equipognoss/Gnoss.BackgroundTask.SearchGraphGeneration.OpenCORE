@@ -16,8 +16,8 @@ searchgraphgeneration:
      base: ${base}
      RabbitMQ__colaReplicacion: ${RabbitMQ}
      RabbitMQ__colaServiciosWin: ${RabbitMQ}
-     Virtuoso__Escritura__VirtuosoLecturaPruebasGnoss_v3: "HOST=192.152.3.24:1111;UID=admin;PWD=admin123;Pooling=true;Max Pool Size=10;Connection Lifetime=15000"
-     Virtuoso__Escritura__VirtuosoLecturaPruebasGnoss_v4: "HOST=192.152.3.22:1111;UID=admin;PWD=admin123;Pooling=true;Max Pool Size=10;Connection Lifetime=15000"
+     Virtuoso__Escritura__VirtuosoLecturaPruebasGnoss_v3: "HOST=192.168.2.5:1111;UID=dba;PWD=dba;Pooling=true;Max Pool Size=10;Connection Lifetime=15000"
+     Virtuoso__Escritura__VirtuosoLecturaPruebasGnoss_v4: "HOST=192.168.2.6:1111;UID=dba;PWD=dba;Pooling=true;Max Pool Size=10;Connection Lifetime=15000"
      BidirectionalReplication__VirtuosoLecturaPruebasGnoss_v3: "VirtuosoLecturaPruebasGnoss_v4"
      BidirectionalReplication__VirtuosoLecturaPruebasGnoss_v4: "VirtuosoLecturaPruebasGnoss_v3"
      redis__redis__ip__master: ${redis__redis__ip__master}
