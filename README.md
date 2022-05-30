@@ -1,3 +1,5 @@
+![](https://content.gnoss.ws/imagenes/proyectos/personalizacion/7e72bf14-28b9-4beb-82f8-e32a3b49d9d3/cms/logognossazulprincipal.png)
+
 # Gnoss.BackgroundTask.SearchGraphGeneration.OpenCORE
 
 Aplicación de segundo plano que se encarga de insertar en el grafo de búsqueda los triples de cada elemento que se cree en la comunidad (recurso, persona, etc).
@@ -32,7 +34,7 @@ searchgraphgeneration:
      connectionType: "0"
      intervalo: "100"
     volumes:
-     - ./logs/base:/app/logs
+     - ./logs/searchgraphgeneration:/app/logs
 ```
 
 Se pueden consultar los posibles valores de configuración de cada parámetro aquí: https://github.com/equipognoss/Gnoss.Platform.Deploy
