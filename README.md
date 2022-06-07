@@ -4,6 +4,12 @@
 
 Aplicación de segundo plano que se encarga de insertar en el grafo de búsqueda los triples de cada elemento que se cree en la comunidad (recurso, persona, etc).
 
+Colas que escucha este servicio: 
+* ColaTagsComunidades: Se envía un mensaje cada vez que se crea, comparte, edita o elimina un recurso desde la Web o el API para que este servicio cree, modifique o elimine los triples del recurso en una comunidad. 
+* ColaTagsCom_Per_Org: Se envía un mensaje cada vez que se registra un usuario, edita su perfil o da de baja de una comunidad desde la Web o el API para que este servicio cree, modifique o elimine los triples de esa persona en una comunidad. 
+* ColaTagsProyectos: Se envía un mensaje cada vez que se da de alta, se modifica o se cierra un proyecto desde la Web o el API para que este servicio cree, modifique o elimine los triples de ese proyecto en una comunidad. 
+* ColaTagsPaginaCMS: Se envía un mensaje cada vez que se da de alta, se modifica o se elimina una página del CMS a través de la Web para que este servicio cree, modifique o elimine los triples de esa página de CMS en una comunidad. 
+
 Configuración estandar de esta aplicación en el archivo docker-compose.yml: 
 
 ```yml
