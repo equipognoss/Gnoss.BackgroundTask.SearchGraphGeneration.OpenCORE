@@ -2,6 +2,8 @@
 
 # Gnoss.BackgroundTask.SearchGraphGeneration.OpenCORE
 
+![](https://github.com/equipognoss/Gnoss.BackgroundTask.SearchGraphGeneration.OpenCORE/workflows/BuildSearchGraphGeneration/badge.svg)
+
 Aplicación de segundo plano que se encarga de insertar en el grafo de búsqueda los triples de cada elemento que se cree en la comunidad (recurso, persona, etc).
 
 Colas que escucha este servicio: 
