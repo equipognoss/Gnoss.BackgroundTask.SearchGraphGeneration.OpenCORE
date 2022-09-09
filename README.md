@@ -41,6 +41,9 @@ searchgraphgeneration:
      Servicios__urlBase: "https://servicios.test.com"
      connectionType: "0"
      intervalo: "100"
+     scopeIdentity: ${scopeIdentity}
+     clientIDIdentity: ${clientIDIdentity}
+     clientSecretIdentity: ${clientIDIdentity}
     volumes:
      - ./logs/searchgraphgeneration:/app/logs
 ```
