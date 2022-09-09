@@ -57,6 +57,7 @@ using Newtonsoft.Json;
 using Es.Riam.Gnoss.AD.Tags;
 using Es.Riam.Gnoss.AD.EntityModel.Models.BASE;
 using Es.Riam.AbstractsOpen;
+using Es.Riam.Gnoss.Util.Seguridad;
 
 namespace GnossServicioModuloBASE
 {
@@ -2078,7 +2079,9 @@ namespace GnossServicioModuloBASE
                                         {
                                             if (filaDocumento.ElementoVinculadoID.HasValue)
                                             {
-                                                string result = CallWebMethods.CallGetApi(urlServicioArchivos, $"ObtenerXmlOntologia?pOntologiaID={filaDocumento.ElementoVinculadoID.Value}");
+                                                CallTokenService callTokenService = new CallTokenService(mConfigService);
+                                                TokenBearer token = callTokenService.CallTokenApi();
+                                                string result = CallWebMethods.CallGetApiToken(urlServicioArchivos, $"ObtenerXmlOntologia?pOntologiaID={filaDocumento.ElementoVinculadoID.Value}", token);
                                                 byte[] byteArray = JsonConvert.DeserializeObject<byte[]>(result);
 
                                                 if (byteArray != null)
@@ -4509,7 +4512,9 @@ namespace GnossServicioModuloBASE
                 {
                     urlServicioArchivos = urlServicioArchivos.Replace("https://", "http://");
                 }
-                string result = CallWebMethods.CallGetApi(urlServicioArchivos, $"ObtenerMappingTesauro?pNombreMapeo={pNombreDocumento}");
+                CallTokenService callTokenService = new CallTokenService(mConfigService);
+                TokenBearer token = callTokenService.CallTokenApi();
+                string result = CallWebMethods.CallGetApiToken(urlServicioArchivos, $"ObtenerMappingTesauro?pNombreMapeo={pNombreDocumento}", token);
                 docCL.GuardarDocumentoMapeoTesauro(pProyectoID, arrayMapping, pNombreDocumento);
             }
 
