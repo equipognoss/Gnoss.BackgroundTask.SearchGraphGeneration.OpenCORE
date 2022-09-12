@@ -16,7 +16,7 @@ Configuración estandar de esta aplicación en el archivo docker-compose.yml:
 
 ```yml
 searchgraphgeneration:
-    image: gnoss/searchgraphgeneration
+    image: gnoss/gnoss.backgroundtask.searchgraphgeneration.opencore
     env_file: .env
     environment:
      virtuosoConnectionString: ${virtuosoConnectionString}
