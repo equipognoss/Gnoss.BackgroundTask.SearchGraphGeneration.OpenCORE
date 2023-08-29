@@ -76,6 +76,7 @@ namespace GnossServicioModuloBASE
                 using (var scope = ScopedFactory.CreateScope())
                 {
                     EntityContext entityContext = scope.ServiceProvider.GetRequiredService<EntityContext>();
+                    entityContext.SetTrackingFalse();
                     EntityContextBASE entityContextBASE = scope.ServiceProvider.GetRequiredService<EntityContextBASE>();
                     UtilidadesVirtuoso utilidadesVirtuoso = scope.ServiceProvider.GetRequiredService<UtilidadesVirtuoso>();
                     LoggingService loggingService = scope.ServiceProvider.GetRequiredService<LoggingService>();
@@ -103,7 +104,6 @@ namespace GnossServicioModuloBASE
                         {
                             // Proceso las filas de las páginas del CMS
                             ProcesarFilasDeColaDePaginasCMS(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
-                            servicesUtilVirtuosoAndReplication.ConexionAfinidad = "";
                         }
                     }
                     catch (OperationCanceledException)
@@ -204,13 +204,16 @@ namespace GnossServicioModuloBASE
             using (var scope = ScopedFactory.CreateScope())
             {
                 EntityContext entityContext = scope.ServiceProvider.GetRequiredService<EntityContext>();
+                entityContext.SetTrackingFalse();
                 EntityContextBASE entityContextBASE = scope.ServiceProvider.GetRequiredService<EntityContextBASE>();
                 UtilidadesVirtuoso utilidadesVirtuoso = scope.ServiceProvider.GetRequiredService<UtilidadesVirtuoso>();
                 LoggingService loggingService = scope.ServiceProvider.GetRequiredService<LoggingService>();
                 VirtuosoAD virtuosoAD = scope.ServiceProvider.GetRequiredService<VirtuosoAD>();
                 RedisCacheWrapper redisCacheWrapper = scope.ServiceProvider.GetRequiredService<RedisCacheWrapper>();
                 GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
+                ConfigService configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
                 IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                ComprobarTraza("SearchGraphGeneration", entityContext, loggingService, redisCacheWrapper, configService, servicesUtilVirtuosoAndReplication);
                 bool error = false;
                 try
                 {
@@ -231,8 +234,6 @@ namespace GnossServicioModuloBASE
                         }
                         filaCola = null;
 
-                        servicesUtilVirtuosoAndReplication.ConexionAfinidad = "";
-
                         ControladorConexiones.CerrarConexiones(false);
                     }
                 }
@@ -240,7 +241,10 @@ namespace GnossServicioModuloBASE
                 {
                     return false;
                 }
-
+                finally
+                {
+                    GuardarTraza(loggingService);
+                }
                 return !error;
             }
         }

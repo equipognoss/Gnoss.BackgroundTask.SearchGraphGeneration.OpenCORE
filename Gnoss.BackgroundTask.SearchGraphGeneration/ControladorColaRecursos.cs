@@ -98,13 +98,16 @@ namespace GnossServicioModuloBASE
             using (var scope = ScopedFactory.CreateScope())
             {
                 EntityContext entityContext = scope.ServiceProvider.GetRequiredService<EntityContext>();
+                entityContext.SetTrackingFalse();
                 EntityContextBASE entityContextBASE = scope.ServiceProvider.GetRequiredService<EntityContextBASE>();
                 UtilidadesVirtuoso utilidadesVirtuoso = scope.ServiceProvider.GetRequiredService<UtilidadesVirtuoso>();
                 LoggingService loggingService = scope.ServiceProvider.GetRequiredService<LoggingService>();
                 VirtuosoAD virtuosoAD = scope.ServiceProvider.GetRequiredService<VirtuosoAD>();
                 RedisCacheWrapper redisCacheWrapper = scope.ServiceProvider.GetRequiredService<RedisCacheWrapper>();
                 GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
+                ConfigService configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
                 IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                ComprobarTraza("SearchGraphGeneration", entityContext, loggingService, redisCacheWrapper, configService, servicesUtilVirtuosoAndReplication);
                 bool error = false;
                 try
                 {
@@ -128,7 +131,6 @@ namespace GnossServicioModuloBASE
 
                         filaCola = null;
 
-                        servicesUtilVirtuosoAndReplication.ConexionAfinidad = "";
 
                         ControladorConexiones.CerrarConexiones(false);
                     }
@@ -136,6 +138,10 @@ namespace GnossServicioModuloBASE
                 catch
                 {
                     return false;
+                }
+                finally
+                {
+                    GuardarTraza(loggingService);
                 }
                 return !error;
             }
@@ -241,9 +247,6 @@ namespace GnossServicioModuloBASE
                         //Realizamos la carga por Documento
                         foreach (BaseRecursosComunidadDS.ColaTagsComunidadesRow filaCola in listaRecursosAgregadosMasivosPorProyecto[claveProyecto])
                         {
-                            //agregar afinidad virtuoso
-                            AgregarAfinidadVirtuoso(filaCola, loggingService, entityContext, virtuosoAD, servicesUtilVirtuosoAndReplication);
-
                             List<string> listaTagsDirectosInt = new List<string>();
                             List<string> listaTagsIndirectosInt = new List<string>();
                             Dictionary<short, List<string>> listaTagsFiltrosInt = new Dictionary<short, List<string>>();
@@ -295,8 +298,6 @@ namespace GnossServicioModuloBASE
                                 listaTodosTags.Add(idRecurso, listaTodosTagsInt);
                             }
 
-                            //eliminar afinidad virtuoso
-                            servicesUtilVirtuosoAndReplication.ConexionAfinidad = "";
                         }
                         List<QueryTriples> listaResultadosInformacionComunRecurso = new List<QueryTriples>();
                         if (!diccionarioProyectoDocInformacionComunRecurso.ContainsKey(filaProyecto.ProyectoID))
@@ -359,9 +360,6 @@ namespace GnossServicioModuloBASE
             //Recorro las filas de comunidades
             foreach (BaseRecursosComunidadDS.ColaTagsComunidadesRow filaCola in pBaseRecursosComunidadDS.ColaTagsComunidades.Rows)
             {
-                //agregar afinidad virtuoso
-                AgregarAfinidadVirtuoso(filaCola, loggingService, entityContext, virtuosoAD, servicesUtilVirtuosoAndReplication);
-
                 if (filaCola.Tags.Contains(Constantes.ID_PROY_DESTINO))
                 {
                     error = error || ProcesarFilaCompartirOntologia(filaCola, entityContext, loggingService, virtuosoAD, utilidadesVirtuoso, entityContextBASE, redisCacheWrapper, gnossCache, servicesUtilVirtuosoAndReplication);
@@ -383,8 +381,6 @@ namespace GnossServicioModuloBASE
                 {
                     ControladorConexiones.CerrarConexiones(false);
                     ComprobarCancelacionHilo();
-                    //eliminar afinidad virtuoso
-                    servicesUtilVirtuosoAndReplication.ConexionAfinidad = "";
                 }
 
                 EstaHiloActivo = true;
@@ -630,27 +626,6 @@ namespace GnossServicioModuloBASE
 
             return nfecha + "000000";
 
-        }
-
-        private void AgregarAfinidadVirtuoso(DataRow pFila, LoggingService loggingService, EntityContext entityContext, VirtuosoAD virtuosoAD, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
-        {
-            if (pFila != null && pFila["Tags"] != null)
-            {
-                string tagAfinidad = (string)pFila["Tags"];
-                if (!string.IsNullOrEmpty(tagAfinidad))
-                {
-                    List<string> listaFiltros = BuscarTagFiltroEnCadena(ref tagAfinidad, Constantes.AFINIDAD_VIRTUOSO);
-                    if (listaFiltros.Count > 0 && !string.IsNullOrEmpty(listaFiltros[0]))
-                    {
-                        servicesUtilVirtuosoAndReplication.ConexionAfinidad = listaFiltros[0];
-                        return;
-                    }
-                }
-            }
-
-            // La fila venía sin afinidad, selecciono una
-            FacetadoAD facetadoAD = new FacetadoAD(mUrlIntragnoss, loggingService, entityContext, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication);
-            facetadoAD.CambiarAfinidadVirtuoso();
         }
 
 
