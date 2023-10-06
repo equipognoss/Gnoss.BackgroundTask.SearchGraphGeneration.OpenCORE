@@ -143,7 +143,7 @@ namespace GnossServicioModuloBASE
                 {
                     GuardarTraza(loggingService);
                 }
-                return !error;
+                return true;
             }
         }
 
@@ -221,7 +221,9 @@ namespace GnossServicioModuloBASE
 
             //Diccionario con clave proyecto y valor ( clave documento valor DATASET de FACETADS obtenido por ObtieneInformacionComunRecurso )
             Dictionary<Guid, Dictionary<Guid, FacetaDS>> diccionarioProyectoDocInformacionComunRecurso = new Dictionary<Guid, Dictionary<Guid, FacetaDS>>();
-            
+            //Diccionario con clave proyecto y valor ( clave documento valor DATASET de FACETADS obtenido por ObtieneInformacionExtraRecurso )
+            Dictionary<Guid, Dictionary<Guid, FacetaDS>> diccionarioProyectoDocInformacionExtraRecurso = new Dictionary<Guid, Dictionary<Guid, FacetaDS>>();
+
             ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
             ActualizacionFacetadoCN actualizacionFacetadoCN = new ActualizacionFacetadoCN(mFicheroConfiguracionBD, mUrlIntragnoss, entityContext, loggingService, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication);
             Guid proyectoID = Guid.Empty;
@@ -307,6 +309,15 @@ namespace GnossServicioModuloBASE
                             listaResultadosInformacionComunRecurso.AddRange(actualizacionFacetadoCN.ObtieneInformacionComunRecurso(listaDocsProyecto, filaProyecto.ProyectoID));
                             diccionarioProyectoDocInformacionComunRecurso.Add(filaProyecto.ProyectoID, facetas);
                         }
+
+                        List<QueryTriples> listaResultadosInformacionExtraRecurso = new List<QueryTriples>();
+                        if (!diccionarioProyectoDocInformacionExtraRecurso.ContainsKey(filaProyecto.ProyectoID))
+                        {
+                            //ObtieneInformacionExtraRecurso por proyecto
+                            Dictionary<Guid, FacetaDS> facetas = new Dictionary<Guid, FacetaDS>();
+                            listaResultadosInformacionExtraRecurso.AddRange(actualizacionFacetadoCN.ObtieneInformacionExtraRecurso(listaDocsProyecto, filaProyecto.ProyectoID));
+                            diccionarioProyectoDocInformacionExtraRecurso.Add(filaProyecto.ProyectoID, facetas);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -345,6 +356,14 @@ namespace GnossServicioModuloBASE
                         Dictionary<Guid, FacetaDS> facetas = new Dictionary<Guid, FacetaDS>();
                         listaResultadosInformacionComunRecurso.AddRange(actualizacionFacetadoCN.ObtieneInformacionComunRecurso(listasRecursosID, ProyectoAD.MetaProyecto));
                         diccionarioProyectoDocInformacionComunRecurso.Add(ProyectoAD.MetaProyecto, facetas);
+                    }
+                    List<QueryTriples> listaResultadosInformacionExtraRecurso = new List<QueryTriples>();
+                    if (!diccionarioProyectoDocInformacionExtraRecurso.ContainsKey(ProyectoAD.MetaProyecto))
+                    {
+                        //ObtieneInformacionExtraRecurso por proyecto (MYGNOSS)
+                        Dictionary<Guid, FacetaDS> facetas = new Dictionary<Guid, FacetaDS>();
+                        listaResultadosInformacionExtraRecurso.AddRange(actualizacionFacetadoCN.ObtieneInformacionExtraRecurso(listasRecursosID, ProyectoAD.MetaProyecto));
+                        diccionarioProyectoDocInformacionExtraRecurso.Add(ProyectoAD.MetaProyecto, facetas);
                     }
 
                     //ObtieneInformacionComunRecurso por proyecto (MYGNOSS)
