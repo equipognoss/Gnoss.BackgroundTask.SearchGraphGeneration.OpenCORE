@@ -542,9 +542,24 @@ namespace GnossServicioModuloBASE
 
                     if (pFila is BaseRecursosComunidadDS.ColaTagsComunidadesRow)
                     {
-                        ComprobarFilasRepetidasDataSet((BaseRecursosComunidadDS)pFila.Table.DataSet, (string)pFila["Tags"], (short)pFila["Tipo"], (int)pFila["TablaBaseProyectoID"], (short)EstadosColaTags.Procesado);
-                    }
+                        BaseComunidadCN baseComunidadCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, mServicesUtilVirtuosoAndReplication);
 
+                        if (baseComunidadCN.ExisteColaRabbit("ColaTagsComunidadesLinkedData"))
+                        {
+                            ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+                            Guid proyectoID = ProyectoAD.MetaProyecto;
+
+                            if ((int)pFila["TablaBaseProyectoID"] != 0)
+                            {
+                                DataWrapperProyecto dataWrapperProyecto = proyectoCN.ObtenerProyectoPorTablaBaseProyectoID((int)pFila["TablaBaseProyectoID"]);
+                                proyectoID = dataWrapperProyecto.ListaProyecto.FirstOrDefault().ProyectoID;
+
+                            }
+
+                            ControladorDocumentacion controladorDocumentacion = new ControladorDocumentacion(loggingService, entityContext, mConfigService, redisCacheWrapper, gnossCache, entityContextBASE, virtuosoAD, null, servicesUtilVirtuosoAndReplication);
+                            controladorDocumentacion.InsertLinkedDataRabbit(proyectoID, (string)pFila["Tags"]);
+                        }
+                    }
                 }
             }
             catch (Exception exFila)
@@ -2002,7 +2017,7 @@ namespace GnossServicioModuloBASE
                                     {
                                         mTripletas.Append(FacetadoAD.GenerarTripleta($"<http://gnoss/{idRecursoMay}>", "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>", "\"Encuesta\""));
                                     }
-                                    
+
                                     AnyadirTripleFoafFirstName(mTripletas.ToString(), ElementoID.Value, tripleFoafFirstName);
 
                                     //es la misma en Mygnoss que en una comunidad
@@ -2130,7 +2145,8 @@ namespace GnossServicioModuloBASE
 
                                     //Semántico
                                     LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
-
+                                    //información para comunidad
+                                    listaResultadosInformacionComunRecurso.AddRange(actualizacionFacetadoCN.ObtieneInformacionExtraRecurso(ElementoID.Value, proyID));
                                     foreach (QueryTriples resultado in listaResultadosInformacionComunRecurso)
                                     {
                                         string objeto = resultado.Objeto;
@@ -2148,25 +2164,13 @@ namespace GnossServicioModuloBASE
                                             {
                                                 mTripletas.Append(FacetadoAD.GenerarTripleta(resultado.Sujeto, resultado.Predicado, UtilidadesVirtuoso.PasarObjetoALower(objeto)));
                                             }
+                                            if (resultado.Predicado != "<http://gnoss/hasautor>" && (resultado.Predicado != "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>" || !string.IsNullOrEmpty(typeSem)))
+                                            {
+                                                mTripletasGnoss.Append(FacetadoAD.GenerarTripleta(resultado.Sujeto, resultado.Predicado, UtilidadesVirtuoso.PasarObjetoALower(objeto)));
+                                            }
                                         }
                                         mTripletasContribuciones.Append(FacetadoAD.GenerarTripleta(resultado.Sujeto, resultado.Predicado, UtilidadesVirtuoso.PasarObjetoALower(objeto)));
                                     }
-                                    LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
-
-                                    foreach (QueryTriples query in listaResultadosInformacionComunRecurso)
-                                    {
-                                        string objeto = query.Objeto;
-
-                                        if (query.Predicado.Contains("hastipodoc") && objeto.Contains("19"))
-                                        { objeto = objeto.Replace("19", "2"); }
-                                        if (query.Predicado.Contains("hastipodoc") && objeto.Contains("20"))
-                                        { objeto = objeto.Replace("20", "21"); }
-                                        if (query.Predicado.Contains("hastipodoc") && objeto.Contains("24"))
-                                        { objeto = objeto.Replace("24", "2"); }
-                                        if (query.Predicado.Contains("hastipodoc") && objeto.Contains("25"))
-                                        { objeto = objeto.Replace("25", "21"); }
-                                    }
-
                                     LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
                                     #region borramos cache recursos (y RSS)
                                     if ((short)pFila["Prioridad"] < 11 || (short)pFila["Prioridad"] > 20)
@@ -2206,10 +2210,10 @@ namespace GnossServicioModuloBASE
                                             facetadoCL.InvalidarResultadosYFacetasDeBusquedaEnProyecto(proyID, FacetadoAD.TipoBusquedaToString(TipoBusqueda.Recursos));
                                             facetadoCL.BorrarRSSDeComunidad(proyID);
 
-                                            if (typeSem != "")
+                                            /*if (typeSem != "")
                                             {
                                                 facetadoCL.InvalidarResultadosYFacetasDeBusquedaEnProyecto(proyID, "rdf:type=" + typeSem);
-                                            }
+                                            }*/
 
                                             facetadoCL.Dispose();
 
@@ -2310,7 +2314,7 @@ namespace GnossServicioModuloBASE
                     {
                         string tripletaContactos = FacetadoAD.GenerarTripleta("<http://gnoss/" + idEnMyGnoss.Value.ToString().ToUpper() + ">", "<http://rdfs.org/sioc/ns#has_space>", "<http://gnoss/" + proyID.ToString().ToUpper() + ">");
                         Guid usuarioID = actualizacionFacetadoCN.ObtenerIdUsuarioDesdeIdentidad(idEnMyGnoss.Value);
-                        tripletaContactos += FacetadoAD.GenerarTripleta($"<http://gnoss/{ usuarioID.ToString().ToUpper() }>", "<http://gnoss/IdentidadID>", $"<http://gnoss/{ idEnMyGnoss.Value.ToString().ToUpper() }>");
+                        tripletaContactos += FacetadoAD.GenerarTripleta($"<http://gnoss/{usuarioID.ToString().ToUpper()}>", "<http://gnoss/IdentidadID>", $"<http://gnoss/{idEnMyGnoss.Value.ToString().ToUpper()}>");
                         InsertarTripletas_ControlCheckPoint(ObtenerPrioridadFila(pFila), "contactos", tripletaContactos, 0, entityContext, loggingService, virtuosoAD, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
                     }
 
@@ -2354,7 +2358,7 @@ namespace GnossServicioModuloBASE
                                 string predicadoLimpio = predicado.Replace("<", "").Replace(">", "").Replace("http://gnoss/", "").Trim();
                                 string objeto = query.Objeto;
 
-                                mTripletas.Append(FacetadoAD.GenerarTripleta(query.Sujeto.Replace(idRecursoMinuscula,idRecursoMayuscula), predicado, objeto));
+                                mTripletas.Append(FacetadoAD.GenerarTripleta(query.Sujeto.Replace(idRecursoMinuscula, idRecursoMayuscula), predicado, objeto));
                             }
                         }
 
@@ -2466,7 +2470,7 @@ namespace GnossServicioModuloBASE
 
                         Guid usuarioID = actualizacionFacetadoCN.ObtenerIdUsuarioDesdeIdentidad(idEnMyGnoss.Value);
 
-                        tripletaContactos += FacetadoAD.GenerarTripleta($"<http://gnoss/{ usuarioID.ToString() }>", "<http://gnoss/IdentidadID>", $"<http://gnoss/{ idEnMyGnoss.Value.ToString().ToUpper() }>");
+                        tripletaContactos += FacetadoAD.GenerarTripleta($"<http://gnoss/{usuarioID.ToString()}>", "<http://gnoss/IdentidadID>", $"<http://gnoss/{idEnMyGnoss.Value.ToString().ToUpper()}>");
 
                         InsertarTripletas_ControlCheckPoint(ObtenerPrioridadFila(pFila), "contactos", tripletaContactos, 0, entityContext, loggingService, virtuosoAD, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
                         //FiN REGION CONTACTOS
@@ -2961,7 +2965,7 @@ namespace GnossServicioModuloBASE
             FacetaDS tConfiguracion = new FacetaDS();
 
             Guid? id = null;
-            List<Guid> listaIdentidades = null;
+            List<Guid> listaIdentidades = new List<Guid>();
 
             FacetadoCN facetadoCN2 = new FacetadoCN(mUrlIntragnoss, proyID.ToString(), entityContext, loggingService, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication);
             facetadoCN2.FacetadoAD.CadenaConexionBase = this.mFicheroConfiguracionBDBase;
@@ -3282,9 +3286,9 @@ namespace GnossServicioModuloBASE
                         facetadoCN2.BorrarRecurso(perfil.ToString(), id.Value, 0, "", false, borrarAuxiliar);
                     }
 
-                    if(listaIdentidades.Count > 0)
+                    if (listaIdentidades.Count > 0)
                     {
-                        foreach(Guid identidadID in listaIdentidades)
+                        foreach (Guid identidadID in listaIdentidades)
                         {
                             facetadoCN2.BorrarRecurso(proyID.ToString(), identidadID, 0, "", false, borrarAuxiliar, !(pFila.Table.DataSet is BaseRecursosComunidadDS));
                         }
@@ -3294,7 +3298,7 @@ namespace GnossServicioModuloBASE
                         facetadoCN2.BorrarRecurso(proyID.ToString(), id.Value, 0, "", false, borrarAuxiliar, !(pFila.Table.DataSet is BaseRecursosComunidadDS));
                     }
 
-                    
+
                 }
             }
 

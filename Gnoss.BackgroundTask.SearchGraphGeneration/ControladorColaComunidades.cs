@@ -303,7 +303,7 @@ namespace GnossServicioModuloBASE
                 {
                     GuardarTraza(loggingService);
                 }
-                return !error;
+                return true;
             }
         }
         /// <summary>
