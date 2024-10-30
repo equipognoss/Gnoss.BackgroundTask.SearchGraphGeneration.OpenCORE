@@ -33,6 +33,8 @@ using Es.Riam.Gnoss.AD.Virtuoso;
 using Es.Riam.Gnoss.CL;
 using Es.Riam.Gnoss.AD.EntityModel.Models.BASE;
 using Es.Riam.AbstractsOpen;
+using Es.Riam.Gnoss.UtilServiciosWeb;
+using System.Text;
 
 namespace GnossServicioModuloBASE
 {
@@ -42,6 +44,7 @@ namespace GnossServicioModuloBASE
 
         private const string COLA_TAGS_COMUNIDADES = "ColaTagsComunidades";
         private const string EXCHANGE = "";
+        private const string VERIFICAR_ONTOLOGIAS = "VERIFICAR_SERVICIO_ONTOLOGIAS";
 
         #endregion
 
@@ -121,29 +124,56 @@ namespace GnossServicioModuloBASE
                         BaseRecursosComunidadDS.ColaTagsComunidadesRow filaCola = (BaseRecursosComunidadDS.ColaTagsComunidadesRow)new BaseRecursosComunidadDS().ColaTagsComunidades.Rows.Add(itemArray);
                         itemArray = null;
 
-                        error = ProcesarFilasDeColaDeRecursos((BaseRecursosComunidadDS)filaCola.Table.DataSet, entityContext, loggingService, entityContextBASE, virtuosoAD,redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, true);
-
-                        if (!error)
+                        if (filaCola.Tags.Equals(VERIFICAR_ONTOLOGIAS))
                         {
-
-                            InsertarColaTagsComunidades(filaCola, loggingService);
+                            VerificarServicioOntologias(gnossCache, configService, loggingService);
                         }
+                        else
+                        {
+                            error = ProcesarFilasDeColaDeRecursos((BaseRecursosComunidadDS)filaCola.Table.DataSet, entityContext, loggingService, entityContextBASE, virtuosoAD, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, true);
 
+                            if (!error)
+                            {
+
+                                InsertarColaTagsComunidades(filaCola, loggingService);
+                            }
+                        }
                         filaCola = null;
 
 
                         ControladorConexiones.CerrarConexiones(false);
                     }
                 }
-                catch
+                catch(Exception ex)
                 {
-                    return false;
+                    GuardarLog(ex, loggingService);
+                    return true;
                 }
                 finally
                 {
                     GuardarTraza(loggingService);
                 }
                 return true;
+            }
+        }
+
+        private void VerificarServicioOntologias(GnossCache pGnossCache, ConfigService pConfigService, LoggingService pLoggingService)
+        {
+            string cadenaDePrueba = "ontologia vacia";
+
+            try
+            {
+                CallFileService servicioArch = new CallFileService(pConfigService, pLoggingService);
+                servicioArch.GuardarOntologia(Encoding.UTF8.GetBytes(cadenaDePrueba), ProyectoAD.MetaProyecto);
+
+                string respuesta = servicioArch.ObtenerOntologia(ProyectoAD.MetaProyecto);
+
+                pGnossCache.AgregarObjetoCache(VERIFICAR_ONTOLOGIAS, respuesta.Equals(cadenaDePrueba), 60);
+            }
+            catch(Exception ex)
+            {
+                mLoggingService.GuardarLogError(ex);
+                pGnossCache.AgregarObjetoCache(VERIFICAR_ONTOLOGIAS, false, 60);
             }
         }
 
@@ -365,9 +395,6 @@ namespace GnossServicioModuloBASE
                         listaResultadosInformacionExtraRecurso.AddRange(actualizacionFacetadoCN.ObtieneInformacionExtraRecurso(listasRecursosID, ProyectoAD.MetaProyecto));
                         diccionarioProyectoDocInformacionExtraRecurso.Add(ProyectoAD.MetaProyecto, facetas);
                     }
-
-                    //ObtieneInformacionComunRecurso por proyecto (MYGNOSS)
-                    actualizacionFacetadoCN.ObtieneInformacionPrivacidadRecursoMyGnoss(listasRecursosID);
                 }
                 catch (Exception ex)
                 {
