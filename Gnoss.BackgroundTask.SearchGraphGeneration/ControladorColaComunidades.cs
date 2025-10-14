@@ -18,11 +18,16 @@ using Es.Riam.Gnoss.CL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Es.Riam.AbstractsOpen;
+using Es.Riam.Interfaces.InterfacesOpen;
+using Microsoft.Extensions.Logging;
+using Es.Riam.Gnoss.Elementos.Suscripcion;
 
 namespace GnossServicioModuloBASE
 {
     internal class ControladorColaComunidades : Controlador
     {
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
         /// <summary>
         /// 
         /// </summary>
@@ -33,9 +38,11 @@ namespace GnossServicioModuloBASE
         /// <param name="pEmailErrores"></param>
         /// <param name="pHoraEnvioErrores"></param>
         /// <param name="pEscribirFicheroExternoTriples"></param>
-        public ControladorColaComunidades(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScope, ConfigService configService, int sleep = 0)
-            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples, serviceScope, configService)
+        public ControladorColaComunidades(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScope, ConfigService configService, ILogger<ControladorColaComunidades> logger, ILoggerFactory loggerFactory, int sleep = 0)
+            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples, serviceScope, configService,logger,loggerFactory)
         {
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
         }
 
         /// <summary>
@@ -49,7 +56,7 @@ namespace GnossServicioModuloBASE
             try
             {
                 //Comunidades de MyGnoss
-                BaseComunidadCN brProyectosCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, null);
+                BaseComunidadCN brProyectosCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, null, mLoggerFactory.CreateLogger<BaseComunidadCN>(), mLoggerFactory);
                 mBaseProyectosDS = (BaseProyectosDS)brProyectosCN.ObtenerElementosColaPendientes(numMaxItems, mSoloPrioridad0);
                 brProyectosCN.Dispose();
 
@@ -71,7 +78,7 @@ namespace GnossServicioModuloBASE
                 RabbitMQClient.ReceivedDelegate funcionProcesarItem = new RabbitMQClient.ReceivedDelegate(ProcesarItem);
                 RabbitMQClient.ShutDownDelegate funcionShutDown = new RabbitMQClient.ShutDownDelegate(OnShutDown);
 
-                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsProyectos",loggingService, mConfigService, "", "ColaTagsProyectos");
+                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsProyectos",loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, "", "ColaTagsProyectos");
 
                 try
                 {
@@ -88,7 +95,7 @@ namespace GnossServicioModuloBASE
                     }
                     else
                     {
-                        loggingService.GuardarLogError(ex);
+                        loggingService.GuardarLogError(ex, mlogger);
                         throw;
                     }
                 }
@@ -112,6 +119,7 @@ namespace GnossServicioModuloBASE
                     RedisCacheWrapper redisCacheWrapper = scope.ServiceProvider.GetRequiredService<RedisCacheWrapper>();
                     GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                     IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                    IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                     if (mReiniciarCola)
                     {
                         RealizarMantenimientoRabbitMQ(loggingService);
@@ -133,7 +141,7 @@ namespace GnossServicioModuloBASE
                             bool error = false;
 
                             //Proceso las filas de comunidades de MyGnoss
-                            error = ProcesarFilasDeColaDeComunidades(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                            error = ProcesarFilasDeColaDeComunidades(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
 
                             if (error)
                             {
@@ -185,7 +193,7 @@ namespace GnossServicioModuloBASE
 
                             try
                             {
-                                BaseComunidadCN brProyectosCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, servicesUtilVirtuosoAndReplication);
+                                BaseComunidadCN brProyectosCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<BaseComunidadCN>(), mLoggerFactory);
                                 brProyectosCN.EliminarElementosColaProcesadosViejos();
                                 brProyectosCN.Dispose();
                             }
@@ -267,6 +275,7 @@ namespace GnossServicioModuloBASE
                 GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                 ConfigService configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
                 IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                 ComprobarTraza("SearchGraphGeneration", entityContext, loggingService, redisCacheWrapper, configService, servicesUtilVirtuosoAndReplication);
                 bool error = false;
                 try
@@ -282,7 +291,7 @@ namespace GnossServicioModuloBASE
                         BaseProyectosDS.ColaTagsProyectosRow filaCola = (BaseProyectosDS.ColaTagsProyectosRow)new BaseProyectosDS().ColaTagsProyectos.Rows.Add(itemArray);
                         itemArray = null;
 
-                        error = ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                        error = ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
 
                         if (!error)
                         {
@@ -317,12 +326,12 @@ namespace GnossServicioModuloBASE
 
             if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN))
             {
-                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, exchange, colaRabbit);
+                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, exchange, colaRabbit);
                 rabbitMQ.AgregarElementoACola(JsonConvert.SerializeObject(pFilaCola.ItemArray));
                 rabbitMQ.Dispose();
             }
         }
-        protected bool ProcesarFilasDeColaDeComunidades(EntityContext entityContext, LoggingService loggingService, VirtuosoAD virtuosoAD, EntityContextBASE entityContextBASE, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        protected bool ProcesarFilasDeColaDeComunidades(EntityContext entityContext, LoggingService loggingService, VirtuosoAD virtuosoAD, EntityContextBASE entityContextBASE, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, IAvailableServices availableServices)
         {
             bool error = false;
 
@@ -330,7 +339,7 @@ namespace GnossServicioModuloBASE
             foreach (BaseProyectosDS.ColaTagsProyectosRow filaCola in mBaseProyectosDS.ColaTagsProyectos.Rows)
             {
                 //Proceso la fila
-                error = error || ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                error = error || ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
 
                 ControladorConexiones.CerrarConexiones(false);
                 ComprobarCancelacionHilo();
@@ -348,7 +357,7 @@ namespace GnossServicioModuloBASE
 
         protected override ControladorServicioGnoss ClonarControlador()
         {
-            ControladorColaComunidades controlador = new ControladorColaComunidades(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService);
+            ControladorColaComunidades controlador = new ControladorColaComunidades(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService, mLoggerFactory.CreateLogger<ControladorColaComunidades>(), mLoggerFactory);
             return controlador;
         }
     }

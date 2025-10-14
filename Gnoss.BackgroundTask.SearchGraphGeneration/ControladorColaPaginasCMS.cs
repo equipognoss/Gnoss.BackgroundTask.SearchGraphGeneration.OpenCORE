@@ -16,11 +16,16 @@ using Es.Riam.Gnoss.AD.EntityModelBASE;
 using Es.Riam.Gnoss.CL;
 using Es.Riam.Gnoss.AD.Virtuoso;
 using Es.Riam.AbstractsOpen;
+using Es.Riam.Interfaces.InterfacesOpen;
+using Microsoft.Extensions.Logging;
+using Es.Riam.Gnoss.Elementos.Suscripcion;
 
 namespace GnossServicioModuloBASE
 {
     internal class ControladorColaPaginasCMS : Controlador
     {
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
         /// <summary>
         /// 
         /// </summary>
@@ -31,9 +36,11 @@ namespace GnossServicioModuloBASE
         /// <param name="pEmailErrores"></param>
         /// <param name="pHoraEnvioErrores"></param>
         /// <param name="pEscribirFicheroExternoTriples"></param>
-        public ControladorColaPaginasCMS(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScope,ConfigService configService,  int sleep = 0)
-            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples,serviceScope, configService, sleep)
+        public ControladorColaPaginasCMS(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScope,ConfigService configService, ILogger<ControladorColaPaginasCMS> logger, ILoggerFactory loggerFactory,  int sleep = 0)
+            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples,serviceScope, configService, logger, loggerFactory, sleep)
         {
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
         }
 
         protected override void RealizarMantenimientoRabbitMQ(LoggingService loggingService, bool reintentar = true)
@@ -43,7 +50,7 @@ namespace GnossServicioModuloBASE
                 RabbitMQClient.ReceivedDelegate funcionProcesarItem = new RabbitMQClient.ReceivedDelegate(ProcesarItem);
                 RabbitMQClient.ShutDownDelegate funcionShutDown = new RabbitMQClient.ShutDownDelegate(OnShutDown);
 
-                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsPaginaCMS", loggingService, mConfigService, "", "ColaTagsPaginaCMS");
+                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsPaginaCMS", loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, "", "ColaTagsPaginaCMS");
 
                 try
                 {
@@ -60,7 +67,7 @@ namespace GnossServicioModuloBASE
                     }
                     else
                     {
-                        loggingService.GuardarLogError(ex);
+                        loggingService.GuardarLogError(ex, mlogger);
                         throw;
                     }
                 }
@@ -84,6 +91,7 @@ namespace GnossServicioModuloBASE
                     RedisCacheWrapper redisCacheWrapper = scope.ServiceProvider.GetRequiredService<RedisCacheWrapper>();
                     GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                     IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                    IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                     if (mReiniciarCola)
                     {
                         RealizarMantenimientoRabbitMQ(loggingService);
@@ -103,7 +111,7 @@ namespace GnossServicioModuloBASE
                         if (hayElementosPendientes)
                         {
                             // Proceso las filas de las páginas del CMS
-                            ProcesarFilasDeColaDePaginasCMS(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                            ProcesarFilasDeColaDePaginasCMS(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
                         }
                     }
                     catch (OperationCanceledException)
@@ -213,6 +221,7 @@ namespace GnossServicioModuloBASE
                 GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                 ConfigService configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
                 IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                 ComprobarTraza("SearchGraphGeneration", entityContext, loggingService, redisCacheWrapper, configService, servicesUtilVirtuosoAndReplication);
                 bool error = false;
                 try
@@ -227,7 +236,7 @@ namespace GnossServicioModuloBASE
                         BasePaginaCMSDS.ColaTagsPaginaCMSRow filaCola = (BasePaginaCMSDS.ColaTagsPaginaCMSRow)new BasePaginaCMSDS().ColaTagsPaginaCMS.Rows.Add(itemArray);
                         itemArray = null;
 
-                        error = ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                        error = ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
                         if (!error)
                         {
                             //InsertarColaTagsPaginaCMSAutoCompletar(filaCola, loggingService);
@@ -260,7 +269,7 @@ namespace GnossServicioModuloBASE
 
             if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN))
             {
-                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, exchange, colaRabbit);
+                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, exchange, colaRabbit);
                 rabbitMQ.AgregarElementoACola(JsonConvert.SerializeObject(pFilaCola.ItemArray));
                 rabbitMQ.Dispose();
             }
@@ -269,7 +278,7 @@ namespace GnossServicioModuloBASE
         /// Procesa las filas de las Paginas del CMS
         /// </summary>
         /// <returns>Verdad si ha habido algún error</returns>
-        protected bool ProcesarFilasDeColaDePaginasCMS(EntityContext entityContext, LoggingService loggingService, VirtuosoAD virtuosoAD, EntityContextBASE entityContextBASE, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        protected bool ProcesarFilasDeColaDePaginasCMS(EntityContext entityContext, LoggingService loggingService, VirtuosoAD virtuosoAD, EntityContextBASE entityContextBASE, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, IAvailableServices availableServices)
         {
             bool error = false;
 
@@ -277,7 +286,7 @@ namespace GnossServicioModuloBASE
             foreach (BasePaginaCMSDS.ColaTagsPaginaCMSRow filaCola in mBasePaginaCMSDS.ColaTagsPaginaCMS.Rows)
             {
                 //Proceso la fila
-                error = error || ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                error = error || ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
 
                 ControladorConexiones.CerrarConexiones(false);
                 ComprobarCancelacionHilo();
@@ -295,7 +304,7 @@ namespace GnossServicioModuloBASE
 
         protected override ControladorServicioGnoss ClonarControlador()
         {
-            ControladorColaPaginasCMS controlador = new ControladorColaPaginasCMS(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService);
+            ControladorColaPaginasCMS controlador = new ControladorColaPaginasCMS(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService, mLoggerFactory.CreateLogger<ControladorColaPaginasCMS>(), mLoggerFactory);
             return controlador;
         }
     }

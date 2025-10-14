@@ -35,11 +35,16 @@ using Es.Riam.Gnoss.AD.EntityModel.Models.BASE;
 using Es.Riam.AbstractsOpen;
 using Es.Riam.Gnoss.UtilServiciosWeb;
 using System.Text;
+using Es.Riam.Interfaces.InterfacesOpen;
+using Microsoft.Extensions.Logging;
+using Es.Riam.Gnoss.Elementos.Suscripcion;
 
 namespace GnossServicioModuloBASE
 {
     internal class ControladorColaRecursos : Controlador
     {
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
         #region Constantes
 
         private const string COLA_TAGS_COMUNIDADES = "ColaTagsComunidades";
@@ -57,9 +62,11 @@ namespace GnossServicioModuloBASE
         /// <param name="pEmailErrores"></param>
         /// <param name="pHoraEnvioErrores"></param>
         /// <param name="pEscribirFicheroExternoTriples"></param>
-        public ControladorColaRecursos(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples,IServiceScopeFactory serviceScope, ConfigService configService, int sleep = 0)
-            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples, serviceScope, configService, sleep)
+        public ControladorColaRecursos(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples,IServiceScopeFactory serviceScope, ConfigService configService, ILogger<ControladorColaRecursos> logger, ILoggerFactory loggerFactory, int sleep = 0)
+            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples, serviceScope, configService,logger,loggerFactory, sleep)
         {
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
         }
 
         protected override void RealizarMantenimientoRabbitMQ(LoggingService loggingService, bool reintentar = true)
@@ -70,7 +77,7 @@ namespace GnossServicioModuloBASE
                 RabbitMQClient.ReceivedDelegate funcionProcesarItem = new RabbitMQClient.ReceivedDelegate(ProcesarItem);
                 RabbitMQClient.ShutDownDelegate funcionShutDown = new RabbitMQClient.ShutDownDelegate(OnShutDown);
 
-                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, COLA_TAGS_COMUNIDADES,loggingService, mConfigService, EXCHANGE, COLA_TAGS_COMUNIDADES);
+                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, COLA_TAGS_COMUNIDADES,loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, EXCHANGE, COLA_TAGS_COMUNIDADES);
 
                 try
                 {
@@ -87,7 +94,7 @@ namespace GnossServicioModuloBASE
                     }
                     else
                     {
-                        loggingService.GuardarLogError(ex);
+                        loggingService.GuardarLogError(ex, mlogger);
                         throw;
                     }
                 }
@@ -110,6 +117,7 @@ namespace GnossServicioModuloBASE
                 GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                 ConfigService configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
                 IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                 ComprobarTraza("SearchGraphGeneration", entityContext, loggingService, redisCacheWrapper, configService, servicesUtilVirtuosoAndReplication);
                 bool error = false;
                 try
@@ -130,12 +138,12 @@ namespace GnossServicioModuloBASE
                         }
                         else
                         {
-                            error = ProcesarFilasDeColaDeRecursos((BaseRecursosComunidadDS)filaCola.Table.DataSet, entityContext, loggingService, entityContextBASE, virtuosoAD, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, true);
+                            error = ProcesarFilasDeColaDeRecursos((BaseRecursosComunidadDS)filaCola.Table.DataSet, entityContext, loggingService, entityContextBASE, virtuosoAD, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices, true);
 
                             if (!error)
                             {
 
-                                InsertarColaTagsComunidades(filaCola, loggingService);
+                                InsertarColaTagsComunidades(filaCola, loggingService, availableServices);
                             }
                         }
                         filaCola = null;
@@ -172,7 +180,7 @@ namespace GnossServicioModuloBASE
             }
             catch(Exception ex)
             {
-                mLoggingService.GuardarLogError(ex);
+                pLoggingService.GuardarLogError(ex, mlogger);
                 pGnossCache.AgregarObjetoCache(VERIFICAR_ONTOLOGIAS, false, 60);
             }
         }
@@ -181,14 +189,14 @@ namespace GnossServicioModuloBASE
         /// Inserta en la cola de Rabbit los tags de las comunidades
         /// </summary>
         /// <param name="pFilaCola">Parámetro de la fila para la cola</param>
-        public void InsertarColaTagsComunidades(BaseRecursosComunidadDS.ColaTagsComunidadesRow pFilaCola, LoggingService loggingService)
+        public void InsertarColaTagsComunidades(BaseRecursosComunidadDS.ColaTagsComunidadesRow pFilaCola, LoggingService loggingService, IAvailableServices availableServices)
         {
             string exchange = "";
             string colaRabbit = "ColaTagsComunidadesGeneradorAutocompletar";
             
-            if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN))
+            if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN) && availableServices.CheckIfServiceIsAvailable(availableServices.GetBackServiceCode(BackgroundService.AutocompleteGenerator), ServiceType.Background))
             {
-                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, exchange, colaRabbit);
+                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, exchange, colaRabbit);
                 rabbitMQ.AgregarElementoACola(JsonConvert.SerializeObject(pFilaCola.ItemArray));
                 rabbitMQ.Dispose();
             }
@@ -198,9 +206,9 @@ namespace GnossServicioModuloBASE
         /// Procesa las filas de recursos
         /// </summary>
         /// <returns>Verdad si ha habido algún error</returns>
-        private bool ProcesarFilasDeColaDeRecursos(BaseRecursosComunidadDS pBaseRecursosComunidadDS, EntityContext entityContext, LoggingService loggingService, EntityContextBASE entityContextBASE, VirtuosoAD virtuosoAD, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, bool pEsFilaRabbit = false)
+        private bool ProcesarFilasDeColaDeRecursos(BaseRecursosComunidadDS pBaseRecursosComunidadDS, EntityContext entityContext, LoggingService loggingService, EntityContextBASE entityContextBASE, VirtuosoAD virtuosoAD, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, IAvailableServices availableServices, bool pEsFilaRabbit = false)
         {
-            ParametroAplicacionCN paramApp = new ParametroAplicacionCN(entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+            ParametroAplicacionCN paramApp = new ParametroAplicacionCN(entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ParametroAplicacionCN>(), mLoggerFactory);
             string valor = paramApp.ObtenerParametroBusquedaPorTextoLibrePersonalizado();
             bool noGenerarSearch = !string.IsNullOrEmpty(valor) && valor.Equals("1");
             bool error = false;
@@ -254,8 +262,8 @@ namespace GnossServicioModuloBASE
             //Diccionario con clave proyecto y valor ( clave documento valor DATASET de FACETADS obtenido por ObtieneInformacionExtraRecurso )
             Dictionary<Guid, Dictionary<Guid, FacetaDS>> diccionarioProyectoDocInformacionExtraRecurso = new Dictionary<Guid, Dictionary<Guid, FacetaDS>>();
 
-            ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
-            ActualizacionFacetadoCN actualizacionFacetadoCN = new ActualizacionFacetadoCN(mFicheroConfiguracionBD, mUrlIntragnoss, entityContext, loggingService, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication);
+            ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
+            ActualizacionFacetadoCN actualizacionFacetadoCN = new ActualizacionFacetadoCN(mFicheroConfiguracionBD, mUrlIntragnoss, entityContext, loggingService, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ActualizacionFacetadoCN>(), mLoggerFactory);
             Guid proyectoID = Guid.Empty;
             foreach (int claveProyecto in listaRecursosAgregadosMasivosPorProyecto.Keys)
             {
@@ -269,7 +277,7 @@ namespace GnossServicioModuloBASE
                         filasProyecto.Add(claveProyecto, filaProyecto);
                         proyectoID = filaProyecto.ProyectoID;
                         //TieneComponenteCMS
-                        CMSCN cmsCN = new CMSCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+                        CMSCN cmsCN = new CMSCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<CMSCN>(), mLoggerFactory);
                         bool TieneComponenteConCaducidadTipoRecurso = cmsCN.ObtenerSiTieneComponenteConCaducidadTipoRecurso(filaProyecto.ProyectoID);
                         cmsCN.Dispose();
                         ComponenteConCaducidadTipoRecursoProyecto.Add(claveProyecto, TieneComponenteConCaducidadTipoRecurso);
@@ -351,7 +359,7 @@ namespace GnossServicioModuloBASE
                     }
                     catch (Exception ex)
                     {
-                        loggingService.GuardarLogError("ERROR IMPORTANTE CARGA MULTIPLE:  " + ex.ToString());
+                        loggingService.GuardarLogError("ERROR IMPORTANTE CARGA MULTIPLE:  " + ex.ToString(), mlogger);
                     }
                 }
             }
@@ -362,7 +370,7 @@ namespace GnossServicioModuloBASE
                 try
                 {
                     //Si hay multiples documentos hacemos cargas multiples
-                    DocumentacionCN documentacionCN = new DocumentacionCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+                    DocumentacionCN documentacionCN = new DocumentacionCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
                     FacetaDS facetaDS = new FacetaDS();
                     actualizacionFacetadoCN.ObtieneInformacionExtraRecursosContribuciones(listasRecursosID, Guid.Empty, proyectoID);
 
@@ -398,7 +406,7 @@ namespace GnossServicioModuloBASE
                 }
                 catch (Exception ex)
                 {
-                    loggingService.GuardarLogError("ERROR IMPORTANTE CARGA MULTIPLE:  " + ex.ToString());
+                    loggingService.GuardarLogError("ERROR IMPORTANTE CARGA MULTIPLE:  " + ex.ToString(), mlogger);
                 }
             }
             actualizacionFacetadoCN.Dispose();
@@ -415,11 +423,11 @@ namespace GnossServicioModuloBASE
                     //Compruebo si la tabla está creada en la BD
                     if (filasProyecto.ContainsKey(filaCola.TablaBaseProyectoID) && listaOrdenEjecucionDoc.ContainsKey(filaCola.OrdenEjecucion))
                     {
-                        error = error || ProcesarFilaDeCola(filaCola, filasProyecto[filaCola.TablaBaseProyectoID], ComponenteConCaducidadTipoRecursoProyecto[filaCola.TablaBaseProyectoID], listaTagsDirectos[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], listaTagsIndirectos[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], listaTagsFiltros[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], listaTodosTags[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], tConfiguracion, listaDocsBorradores, listaTagsBBDD[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], titulosRecursosBBDD[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], descripcionRecursosBBDD[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], diccionarioProyectoDocInformacionComunRecurso, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                        error = error || ProcesarFilaDeCola(filaCola, filasProyecto[filaCola.TablaBaseProyectoID], ComponenteConCaducidadTipoRecursoProyecto[filaCola.TablaBaseProyectoID], listaTagsDirectos[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], listaTagsIndirectos[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], listaTagsFiltros[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], listaTodosTags[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], tConfiguracion, listaDocsBorradores, listaTagsBBDD[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], titulosRecursosBBDD[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], descripcionRecursosBBDD[listaOrdenEjecucionDoc[filaCola.OrdenEjecucion]], diccionarioProyectoDocInformacionComunRecurso, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
                     }
                     else
                     {
-                        error = error || ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                        error = error || ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
                     }
                 }
 
@@ -476,7 +484,7 @@ namespace GnossServicioModuloBASE
                     }
 
                     //obtener el documento a partir del id
-                    DocumentacionCN docCN = new DocumentacionCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+                    DocumentacionCN docCN = new DocumentacionCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
                     DataWrapperDocumentacion docDW = docCN.ObtenerDocumentoPorID(documentoCompartidoID);
                     string enlaceOnto = docCN.ObtenerEnlaceDocumentoVinculadoADocumento(documentoCompartidoID);
                     docCN.Dispose();
@@ -489,14 +497,14 @@ namespace GnossServicioModuloBASE
                     }
 
                     //proyecto desde el que se comparte
-                    ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+                    ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
                     Proyecto filaProyecto = proyectoCN.ObtenerProyectoPorTablaBaseProyectoID((int)pFila["TablaBaseProyectoID"]).ListaProyecto.FirstOrDefault();
                     Guid proyectoID = filaProyecto.ProyectoID;
                     Guid organizacionID = filaProyecto.OrganizacionID;
                     proyectoCN.Dispose();
 
                     //coger enlace y llamar a una funcion de virtuoso para obtener las triples de esa ontologia a copiar
-                    FacetadoCN facCN = new FacetadoCN(mFicheroConfiguracionBD, mUrlIntragnoss, null, entityContext, loggingService, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication);
+                    FacetadoCN facCN = new FacetadoCN(mFicheroConfiguracionBD, mUrlIntragnoss, null, entityContext, loggingService, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoCN>(), mLoggerFactory);
                     FacetadoDS facDS = facCN.ObtenerTriplesOntologiaACompartir(proyectoID, enlace);
                     facCN.Dispose();
 
@@ -514,7 +522,7 @@ namespace GnossServicioModuloBASE
 
                     if (enlaceOnto != null)
                     {
-                        FacetaCN tablasDeConfiguracionCN = new FacetaCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication);
+                        FacetaCN tablasDeConfiguracionCN = new FacetaCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCN>(), mLoggerFactory);
                         Es.Riam.Gnoss.AD.EntityModel.Models.Faceta.OntologiaProyecto filaOntologia = tablasDeConfiguracionCN.ObtenerOntologiaProyectoPorEnlace(proyectoID, enlaceOnto);
                         if (filaOntologia != null && !filaOntologia.EsBuscable)
                         {
@@ -530,7 +538,7 @@ namespace GnossServicioModuloBASE
                 error = true;
 
                 string mensaje = "Excepción: " + exFila.ToString() + "\n\n\tTraza: " + exFila.StackTrace + "\n\nFila: " + pFila["OrdenEjecucion"];
-                loggingService.GuardarLogError("ERROR:  " + mensaje);
+                loggingService.GuardarLogError("ERROR:  " + mensaje, mlogger);
 
                 pFila["Estado"] = ((short)pFila["Estado"]) + 1; //Aumento en 1 el error, cuando llegue a 4 no se volverá a intentar
 
@@ -582,7 +590,7 @@ namespace GnossServicioModuloBASE
 
 
             string triples = string.Empty;
-            FacetadoAD facetadoAD = new FacetadoAD(mFicheroConfiguracionBD, mUrlIntragnoss, loggingService, entityContext, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication);
+            FacetadoAD facetadoAD = new FacetadoAD(mFicheroConfiguracionBD, mUrlIntragnoss, loggingService, entityContext, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoAD>(), mLoggerFactory);
 
             foreach (DataRow myrow in pTabla.Rows)
             {
@@ -677,7 +685,7 @@ namespace GnossServicioModuloBASE
 
         protected override ControladorServicioGnoss ClonarControlador()
         {
-            ControladorColaRecursos controlador = new ControladorColaRecursos(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService);
+            ControladorColaRecursos controlador = new ControladorColaRecursos(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService, mLoggerFactory.CreateLogger<ControladorColaRecursos>(), mLoggerFactory);
             return controlador;
         }
     }

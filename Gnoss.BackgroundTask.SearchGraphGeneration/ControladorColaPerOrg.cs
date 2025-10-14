@@ -16,11 +16,16 @@ using Es.Riam.Gnoss.AD.EntityModelBASE;
 using Es.Riam.Gnoss.AD.Virtuoso;
 using Es.Riam.Gnoss.CL;
 using Es.Riam.AbstractsOpen;
+using Es.Riam.Interfaces.InterfacesOpen;
+using Microsoft.Extensions.Logging;
+using Es.Riam.Gnoss.Elementos.Suscripcion;
 
 namespace GnossServicioModuloBASE
 {
     internal class ControladorColaPerOrg : Controlador
     {
+        private ILogger mlogger;
+        private ILoggerFactory mLoggerFactory;
         /// <summary>
         /// 
         /// </summary>
@@ -31,9 +36,11 @@ namespace GnossServicioModuloBASE
         /// <param name="pEmailErrores"></param>
         /// <param name="pHoraEnvioErrores"></param>
         /// <param name="pEscribirFicheroExternoTriples"></param>
-        public ControladorColaPerOrg(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScope, ConfigService configService, int sleep = 0)
-            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples, serviceScope, configService, sleep)
+        public ControladorColaPerOrg(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScope, ConfigService configService, ILogger<ControladorColaPerOrg> logger, ILoggerFactory loggerFactory, int sleep = 0)
+            : base(pReplicacion, pRutaBaseTriplesDescarga, pUrlTriplesDescarga, pEmailErrores, pHoraEnvioErrores, pEscribirFicheroExternoTriples, serviceScope, configService,logger,loggerFactory, sleep)
         {
+            mlogger = logger;
+            mLoggerFactory = loggerFactory;
         }
 
         protected override void RealizarMantenimientoRabbitMQ(LoggingService loggingService,bool reintentar = true)
@@ -43,7 +50,7 @@ namespace GnossServicioModuloBASE
                 RabbitMQClient.ReceivedDelegate funcionProcesarItem = new RabbitMQClient.ReceivedDelegate(ProcesarItem);
                 RabbitMQClient.ShutDownDelegate funcionShutDown = new RabbitMQClient.ShutDownDelegate(OnShutDown);
 
-                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsCom_Per_Org",loggingService, mConfigService, "", "ColaTagsCom_Per_Org");
+                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsCom_Per_Org",loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, "", "ColaTagsCom_Per_Org");
 
                 try
                 {
@@ -60,7 +67,7 @@ namespace GnossServicioModuloBASE
                     }
                     else
                     {
-                        loggingService.GuardarLogError(ex);
+                        loggingService.GuardarLogError(ex, mlogger);
                         throw;
                     }
                 }
@@ -82,6 +89,7 @@ namespace GnossServicioModuloBASE
                     RedisCacheWrapper redisCacheWrapper = scope.ServiceProvider.GetRequiredService<RedisCacheWrapper>();
                     GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                     IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                    IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                     if (mReiniciarCola)
                     {
                         RealizarMantenimientoRabbitMQ(loggingService);
@@ -103,7 +111,7 @@ namespace GnossServicioModuloBASE
                             bool error = false;
 
                             //Proceso las filas de personas y organizaciones
-                            error = ProcesarFilasDeColasDePersonasYOrganizaciones(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                            error = ProcesarFilasDeColasDePersonasYOrganizaciones(entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
 
 
                             if (error)
@@ -228,6 +236,7 @@ namespace GnossServicioModuloBASE
                 GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                 ConfigService configService = scope.ServiceProvider.GetRequiredService<ConfigService>();
                 IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
+                IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
                 ComprobarTraza("SearchGraphGeneration", entityContext, loggingService, redisCacheWrapper, configService, servicesUtilVirtuosoAndReplication);
                 bool error = false;
                 try
@@ -242,11 +251,11 @@ namespace GnossServicioModuloBASE
                         BasePerOrgComunidadDS.ColaTagsCom_Per_OrgRow filaCola = (BasePerOrgComunidadDS.ColaTagsCom_Per_OrgRow)new BasePerOrgComunidadDS().ColaTagsCom_Per_Org.Rows.Add(itemArray);
                         itemArray = null;
 
-                        error = ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                        error = ProcesarFilaDeCola(filaCola, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
                         if (!error)
                         {
 
-                            InsertarColaTagsComPerOrgAutoCompletar(filaCola, loggingService);
+                            InsertarColaTagsComPerOrgAutoCompletar(filaCola, loggingService, availableServices);
                         }
 
                         filaCola = null;
@@ -269,14 +278,14 @@ namespace GnossServicioModuloBASE
         /// Inserta en la cola de Rabbit los tags de las comunidades
         /// </summary>
         /// <param name="pFilaCola">Parámetro de la fila para la cola</param>
-        public void InsertarColaTagsComPerOrgAutoCompletar(BasePerOrgComunidadDS.ColaTagsCom_Per_OrgRow pFilaCola, LoggingService loggingService)
+        public void InsertarColaTagsComPerOrgAutoCompletar(BasePerOrgComunidadDS.ColaTagsCom_Per_OrgRow pFilaCola, LoggingService loggingService, IAvailableServices availableServices)
         {
             string exchange = "";
             string colaRabbit = "ColaTagsCom_Per_OrgGeneradorAutocompletar";
 
-            if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN))
+            if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN) && availableServices.CheckIfServiceIsAvailable(availableServices.GetBackServiceCode(BackgroundService.AutocompleteGenerator), ServiceType.Background))
             {
-                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, exchange, colaRabbit);
+                RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, exchange, colaRabbit);
                 rabbitMQ.AgregarElementoACola(JsonConvert.SerializeObject(pFilaCola.ItemArray));
                 rabbitMQ.Dispose();
             }
@@ -285,14 +294,14 @@ namespace GnossServicioModuloBASE
         /// Procesa las filas de personas y organizaciones
         /// </summary>
         /// <returns>Verdad si ha habido algún error</returns>
-        protected bool ProcesarFilasDeColasDePersonasYOrganizaciones(EntityContext entityContext, LoggingService loggingService, VirtuosoAD virtuosoAD, EntityContextBASE entityContextBASE, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        protected bool ProcesarFilasDeColasDePersonasYOrganizaciones(EntityContext entityContext, LoggingService loggingService, VirtuosoAD virtuosoAD, EntityContextBASE entityContextBASE, RedisCacheWrapper redisCacheWrapper, UtilidadesVirtuoso utilidadesVirtuoso, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, IAvailableServices availableServices)
         {
             bool error = false;
 
             //Recorro las filas de personas y organizaciones que participan en una comunidad
             foreach (BasePerOrgComunidadDS.ColaTagsCom_Per_OrgRow filaColaPerOrg in mBasePerOrgComunidadDS.ColaTagsCom_Per_Org.Rows)
             {
-                error = error || ProcesarFilaDeCola(filaColaPerOrg, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication);
+                error = error || ProcesarFilaDeCola(filaColaPerOrg, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
 
                 ControladorConexiones.CerrarConexiones(false);
 
@@ -312,7 +321,7 @@ namespace GnossServicioModuloBASE
 
         protected override ControladorServicioGnoss ClonarControlador()
         {
-            ControladorColaPerOrg controlador = new ControladorColaPerOrg(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService);
+            ControladorColaPerOrg controlador = new ControladorColaPerOrg(mReplicacion, mRutaBaseTriplesDescarga, mUrlTriplesDescarga, mEmailErrores, mHoraEnvioErrores, mEscribirFicheroExternoTriples, ScopedFactory, mConfigService, mLoggerFactory.CreateLogger<ControladorColaPerOrg>(), mLoggerFactory);
             return controlador;
         }
 
