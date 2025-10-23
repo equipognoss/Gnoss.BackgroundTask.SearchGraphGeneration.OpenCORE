@@ -63,6 +63,7 @@ using Universal.Common.Extensions;
 using static Es.Riam.Gnoss.AD.BASE_BD.Model.BaseRecursosComunidadDS;
 using System.Security.Cryptography;
 using Es.Riam.Interfaces.InterfacesOpen;
+using Es.Riam.Gnoss.AD.EntityModel.Models.Documentacion;
 using Microsoft.Extensions.Logging;
 using Es.Riam.Gnoss.Elementos.Suscripcion;
 using Es.Riam.Gnoss.CL.ParametrosProyecto;
@@ -726,23 +727,29 @@ namespace GnossServicioModuloBASE
             string valorSearch = "";
 
             Guid? id = null;
+            Guid? idOriginal = null;
             bool esDocSemantico = false;
             if (pFila.Table.DataSet is BaseRecursosComunidadDS)
             {
                 id = ProcesarFilaDeColaDeTipoAgregadoRecursos(pFila, listaTagsFiltros, ref listaIdsEliminar, ref facetaDW, actualizacionFacetadoCN, proyID, ref valorSearch, ref tags, ref agregarTagsAModeloBase, TieneComponenteConCaducidadTipoRecurso, filaProyecto, organizacionID, listaTablasMantenerConfiguracion, pListaDocsBorradores, listaTags, pTitulo, pDescripcion, pDiccionarioProyectoDocInformacionComunRecurso, ref esDocSemantico, entityContext, loggingService, redisCacheWrapper, entityContextBASE, virtuosoAD, gnossCache, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication, availableServices);
+                idOriginal = ObtenerDocumentoOriginalID(id ?? Guid.Empty, entityContext, loggingService, servicesUtilVirtuosoAndReplication, mConfigService);
+                idOriginal = idOriginal == Guid.Empty ? null : idOriginal;
             }
             else if (pFila.Table.DataSet is BasePerOrgComunidadDS)
             {
                 id = ProcesarFilaDeColaDeTipoAgregadoPersonasYOrganizaciones(pFila, listaTagsFiltros, ref listaIdsEliminar, ref facetaDW, actualizacionFacetadoCN, proyID, ref valorSearch, ref tags, ref agregarTagsAModeloBase, filaProyecto, entityContext, loggingService, virtuosoAD, entityContextBASE, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices);
+                idOriginal = id;
             }
             else if (pFila.Table.DataSet is BaseProyectosDS)
             {
                 id = ProcesarFilaDeColaDeTipoAgregadoProyectos(pFila, listaTagsFiltros, ref facetaDW, actualizacionFacetadoCN, proyID, ref valorSearch, ref tags, entityContext, loggingService, redisCacheWrapper, servicesUtilVirtuosoAndReplication);
+                idOriginal = id;
             }
             else if (pFila.Table.DataSet is BasePaginaCMSDS)
             {
                 // M�todo para generar los triples de la pagina del CMS
                 id = ProcesarFilaDeColaDeTipoAgregadoPaginaCMS(listaTagsFiltros, ref facetaDW, actualizacionFacetadoCN, proyID, ref valorSearch, entityContext, loggingService, redisCacheWrapper, virtuosoAD, servicesUtilVirtuosoAndReplication);
+                idOriginal = id;
             }
 
             bool tripletasYaAgregadas = pFila["Tipo"].Equals((short)TiposElementosEnCola.InsertadoEnGrafoBusquedaDesdeWeb);
@@ -760,7 +767,7 @@ namespace GnossServicioModuloBASE
             {
                 string grafo = proyID.ToString();
 
-                if (id.HasValue && !listaIdsEliminar.ContainsKey(id.Value.ToString()))
+                if (id.HasValue && !listaIdsEliminar.ContainsKey(idOriginal.ToString()))
                 {
                     listaIdsEliminar.Add(id.Value.ToString(), "");
                 }
@@ -811,16 +818,16 @@ namespace GnossServicioModuloBASE
                     if (accionExternaSearch != null && pFila.Table.DataSet is BaseRecursosComunidadDS)
                     {
                         loggingService.AgregarEntrada("Search: se llama a un api externo para generar el search");
-                        string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={id.Value}");
+                        string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={idOriginal.Value}");
                         loggingService.AgregarEntrada("Search: Fin de la llamada al api externo para general al search");
                         valorSearch = $"{valorSearch} {search}";
                     }
                     if (tripleSearch == null)
                     {
-                        tripleSearch = ObtenerTipleSearch(valorSearch, id.Value, proyID, pFila.Table.DataSet is BaseRecursosComunidadDS, entityContext, loggingService, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
+                        tripleSearch = ObtenerTipleSearch(valorSearch, idOriginal.Value, proyID, pFila.Table.DataSet is BaseRecursosComunidadDS, entityContext, loggingService, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
                     }
 
-                    utilidadesVirtuoso.InsertarTriplesEdicionTagsCategoriasSearchRecurso(id.Value, proyID, tripleSearch, mUrlIntragnoss, (PrioridadBase)(short)pFila["Prioridad"], false, false);
+                    utilidadesVirtuoso.InsertarTriplesEdicionTagsCategoriasSearchRecurso(idOriginal.Value, proyID, tripleSearch, mUrlIntragnoss, (PrioridadBase)(short)pFila["Prioridad"], false, false);
                 }
             }
 
@@ -837,7 +844,7 @@ namespace GnossServicioModuloBASE
                     {
                         listaIdsEliminar.Add(id.ToString(), "");
                     }
-                    string sujeto = "<http://gnoss/" + id.Value.ToString().ToUpper() + ">";
+                    string sujeto = "<http://gnoss/" + idOriginal.Value.ToString().ToUpper() + ">";
                     string predicadoprivacidad = "<http://gnoss/hasprivacidadMyGnoss> ";
                     string privacidad = "\"publico\" .";
                     mTripletasPerfilOrganizacion.Append(FacetadoAD.GenerarTripleta(sujeto, predicadoprivacidad, privacidad));
@@ -914,7 +921,7 @@ namespace GnossServicioModuloBASE
                         }
 
                         //Inserto las filas de las relaciones con categorias:
-                        string sujeto = "<http://gnoss/" + id.Value.ToString().ToUpper() + ">";
+                        string sujeto = "<http://gnoss/" + idOriginal.Value.ToString().ToUpper() + ">";
                         string predicado = "<http://www.w3.org/2004/02/skos/core#ConceptID>";
                         foreach (Guid categoriaID in categoriasAgregadas)
                         {
@@ -955,7 +962,7 @@ namespace GnossServicioModuloBASE
 
                         foreach (string autor in autores)
                         {
-                            string sujetoAutor = "<http://gnoss/" + filaDocumento.DocumentoID.ToString().ToUpper() + "> ";
+                            string sujetoAutor = "<http://gnoss/" + idOriginal.ToString().ToUpper() + "> ";
                             string predicadoAutor = "<http://gnoss/hasautor> ";
                             string objetoAutor = "\"" + autor + "\" .";
 
@@ -977,7 +984,7 @@ namespace GnossServicioModuloBASE
                         {
                             objeto = UtilidadesVirtuoso.PasarObjetoALower(objeto);
                         }
-                        mTripletasPerfilOrganizacion.Append(FacetadoAD.GenerarTripleta(query.Sujeto, query.Predicado, objeto));
+                        mTripletasPerfilOrganizacion.Append(FacetadoAD.GenerarTripleta(query.Sujeto.Replace(id.Value.ToString().ToUpper(), idOriginal.ToString().ToUpper()), query.Predicado, objeto));
                     }
 
                     LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
@@ -991,12 +998,12 @@ namespace GnossServicioModuloBASE
                         {
                             if (tripletasYaAgregadas)
                             {
-                                valorSearch = utilidadesVirtuoso.LeerSearchDeVirtuoso(id.Value, proyID, mUrlIntragnoss) + valorSearch;
+                                valorSearch = utilidadesVirtuoso.LeerSearchDeVirtuoso(idOriginal.Value, proyID, mUrlIntragnoss) + valorSearch;
                                 AccionesExternasProyecto accionExternaSearch = dataWrapperProyectoAccionesExternas.ListaAccionesExternasProyecto.FirstOrDefault(item => item.TipoAccion.Equals((short)TipoAccionExterna.GenerarSearch) && item.ProyectoID.Equals(proyID));
                                 if (accionExternaSearch != null && pFila.Table.DataSet is BaseRecursosComunidadDS)
                                 {
                                     loggingService.AgregarEntrada("Search: se llama a un api externo para generar el search");
-                                    string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={id.Value}");
+                                    string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={idOriginal.Value}");
                                     loggingService.AgregarEntrada("Search: Fin de la llamada al api externo para general al search");
                                     valorSearch = $"{valorSearch} {search}";
                                 }
@@ -1006,7 +1013,7 @@ namespace GnossServicioModuloBASE
                         }
 
                         //InsertarTripletas_ControlCheckPoint(ObtenerPrioridadFila(pFila), pp.Value.ToString(), tripleSearch, ObtenerPrioridadFila(pFila), false, "ColaReplicacionMaster");
-                        utilidadesVirtuoso.InsertarTriplesEdicionTagsCategoriasSearchRecurso(id.Value, proyID, tripleSearch, mUrlIntragnoss, (PrioridadBase)(short)pFila["Prioridad"], false, false);
+                        utilidadesVirtuoso.InsertarTriplesEdicionTagsCategoriasSearchRecurso(idOriginal.Value, proyID, tripleSearch, mUrlIntragnoss, (PrioridadBase)(short)pFila["Prioridad"], false, false);
                     }
                 }
             }
@@ -1032,7 +1039,7 @@ namespace GnossServicioModuloBASE
                     {
                         listaIdsEliminar.Add(id.Value.ToString(), "");
                     }
-                    string sujeto = "<http://gnoss/" + id + ">";
+                    string sujeto = "<http://gnoss/" + idOriginal + ">";
                     string predicadoprivacidad = "<http://gnoss/hasprivacidadMyGnoss> ";
                     string privacidad = "\"publico\" .";
                     mTripletasPerfilPersonal.Append(FacetadoAD.GenerarTripleta(sujeto, predicadoprivacidad, privacidad));
@@ -1102,7 +1109,7 @@ namespace GnossServicioModuloBASE
                         }
 
                         //Inserto las filas de las relaciones con categorias:
-                        string sujeto = "<http://gnoss/" + id.ToString().ToUpper() + ">";
+                        string sujeto = "<http://gnoss/" + idOriginal.ToString().ToUpper() + ">";
                         string predicado = "<http://www.w3.org/2004/02/skos/core#ConceptID>";
                         foreach (Guid categoriaID in categoriasAgregadas)
                         {
@@ -1147,7 +1154,7 @@ namespace GnossServicioModuloBASE
 
                         foreach (string autor in autores)
                         {
-                            string sujetoAutor = "<http://gnoss/" + filaDocumento.DocumentoID.ToString().ToUpper() + "> ";
+                            string sujetoAutor = "<http://gnoss/" + idOriginal.ToString().ToUpper() + "> ";
                             string predicadoAutor = "<http://gnoss/hasautor> ";
                             string objetoAutor = "\"" + autor + "\" .";
 
@@ -1178,7 +1185,7 @@ namespace GnossServicioModuloBASE
                         {
                             objeto = UtilidadesVirtuoso.PasarObjetoALower(objeto);
                         }
-                        tripletasPersonalesTemporales += FacetadoAD.GenerarTripleta(query.Sujeto, query.Predicado, objeto);
+                        tripletasPersonalesTemporales += FacetadoAD.GenerarTripleta(query.Sujeto.Replace(id.Value.ToString().ToUpper(), idOriginal.ToString().ToUpper()), query.Predicado, objeto);
                     }
 
                     LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
@@ -1191,29 +1198,29 @@ namespace GnossServicioModuloBASE
                         {
                             if (tripletasYaAgregadas)
                             {
-                                valorSearch = utilidadesVirtuoso.LeerSearchDeVirtuoso(id.Value, proyID, mUrlIntragnoss) + valorSearch;
+                                valorSearch = utilidadesVirtuoso.LeerSearchDeVirtuoso(idOriginal.Value, proyID, mUrlIntragnoss) + valorSearch;
                                 AccionesExternasProyecto accionExternaSearch = dataWrapperProyectoAccionesExternas.ListaAccionesExternasProyecto.FirstOrDefault(item => item.TipoAccion.Equals((short)TipoAccionExterna.GenerarSearch) && item.ProyectoID.Equals(proyID));
                                 if (accionExternaSearch != null && pFila.Table.DataSet is BaseRecursosComunidadDS)
                                 {
                                     loggingService.AgregarEntrada("Search: se llama a un api externo para generar el search");
-                                    string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={id.Value}");
+                                    string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={idOriginal.Value}");
                                     loggingService.AgregarEntrada("Search: Fin de la llamada al api externo para general al search");
                                     valorSearch = $"{valorSearch} {search}";
                                 }
                             }
 
-                            tripleSearch = ObtenerTipleSearch(valorSearch, id.Value, proyID, pFila.Table.DataSet is BaseRecursosComunidadDS, entityContext, loggingService, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
+                            tripleSearch = ObtenerTipleSearch(valorSearch, idOriginal.Value, proyID, pFila.Table.DataSet is BaseRecursosComunidadDS, entityContext, loggingService, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
                         }
 
                         //InsertarTripletas_ControlCheckPoint(ObtenerPrioridadFila(pFila), perfilamodificar, tripleSearch, ObtenerPrioridadFila(pFila), false, "ColaReplicacionMaster");
-                        utilidadesVirtuoso.InsertarTriplesEdicionTagsCategoriasSearchRecurso(id.Value, proyID, tripleSearch, mUrlIntragnoss, (PrioridadBase)(short)pFila["Prioridad"], false, false);
+                        utilidadesVirtuoso.InsertarTriplesEdicionTagsCategoriasSearchRecurso(idOriginal.Value, proyID, tripleSearch, mUrlIntragnoss, (PrioridadBase)(short)pFila["Prioridad"], false, false);
                     }
                 }
             }
 
             if (mTripletasContribuciones.Length > 0 && ((mTripletasPerfilPersonal.Length == 0 && mTripletasPerfilOrganizacion.Length == 0) || !proyID.Equals(ProyectoAD.MetaProyecto)) && generarGrafoContribuciones)
             {
-                if (!listaIdsEliminar.ContainsKey(id.Value.ToString()))
+                if (!listaIdsEliminar.ContainsKey(idOriginal.Value.ToString()))
                 {
                     listaIdsEliminar.Add(id.Value.ToString(), "");
                 }
@@ -1231,7 +1238,7 @@ namespace GnossServicioModuloBASE
                 {
                     if (docCN.EsDocumentoBorrador(id.Value))
                     {
-                        if (!listaIdsEliminar.ContainsKey(id.Value.ToString()))
+                        if (!listaIdsEliminar.ContainsKey(idOriginal.Value.ToString()))
                         {
                             listaIdsEliminar.Add(id.Value.ToString(), "");
                         }
@@ -1254,18 +1261,18 @@ namespace GnossServicioModuloBASE
                         {
                             if (tripletasYaAgregadas)
                             {
-                                valorSearch = utilidadesVirtuoso.LeerSearchDeVirtuoso(id.Value, proyID, mUrlIntragnoss) + valorSearch;
+                                valorSearch = utilidadesVirtuoso.LeerSearchDeVirtuoso(idOriginal.Value, proyID, mUrlIntragnoss) + valorSearch;
                                 AccionesExternasProyecto accionExternaSearch = dataWrapperProyectoAccionesExternas.ListaAccionesExternasProyecto.FirstOrDefault(item => item.TipoAccion.Equals((short)TipoAccionExterna.GenerarSearch) && item.ProyectoID.Equals(proyID));
                                 if (accionExternaSearch != null && pFila.Table.DataSet is BaseRecursosComunidadDS)
                                 {
                                     loggingService.AgregarEntrada("Search: se llama a un api externo para generar el search");
-                                    string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={id.Value}");
+                                    string search = CallWebMethods.CallGetApi(accionExternaSearch.URL, $"?id={idOriginal.Value}");
                                     loggingService.AgregarEntrada("Search: Fin de la llamada al api externo para general al search");
                                     valorSearch = $"{valorSearch} {search}";
                                 }
                             }
 
-                            tripleSearch = ObtenerTipleSearch(valorSearch, id.Value, proyID, pFila.Table.DataSet is BaseRecursosComunidadDS, entityContext, loggingService, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
+                            tripleSearch = ObtenerTipleSearch(valorSearch, idOriginal.Value, proyID, pFila.Table.DataSet is BaseRecursosComunidadDS, entityContext, loggingService, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
                         }
 
                         mTripletasContribuciones.Append(" " + tripleSearch);
@@ -1281,7 +1288,7 @@ namespace GnossServicioModuloBASE
                                 {
                                     objeto = UtilidadesVirtuoso.PasarObjetoALower(objeto);
                                 }
-                                mTripletasContribuciones.Append(FacetadoAD.GenerarTripleta(query.Sujeto, query.Predicado, objeto));
+                                mTripletasContribuciones.Append(FacetadoAD.GenerarTripleta(query.Sujeto.Replace(id.Value.ToString().ToUpper(), idOriginal.Value.ToString().ToUpper()), query.Predicado, objeto));
                             }
                             LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
                             InsertaTripletasConModify_ControlCheckPoint(ObtenerPrioridadFila(pFila), orgID.ToString(), mTripletasContribuciones.ToString(), listaIdsEliminar, "", "", false, loggingService, entityContext, virtuosoAD, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
@@ -1297,7 +1304,7 @@ namespace GnossServicioModuloBASE
                                 {
                                     objeto = UtilidadesVirtuoso.PasarObjetoALower(objeto);
                                 }
-                                mTripletasContribuciones.Append(FacetadoAD.GenerarTripleta(query.Sujeto, query.Predicado, objeto));
+                                mTripletasContribuciones.Append(FacetadoAD.GenerarTripleta(query.Sujeto.Replace(id.Value.ToString().ToUpper(), idOriginal.Value.ToString().ToUpper()), query.Predicado, objeto));
                             }
                             LimpiarConfiguracionExceptoTablasSenialadas(facetaDS, listaTablasMantenerConfiguracion);
                             InsertaTripletasConModify_ControlCheckPoint(ObtenerPrioridadFila(pFila), perfilID.ToString(), mTripletasContribuciones.ToString(), listaIdsEliminar, "", "", false, loggingService, entityContext, virtuosoAD, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
@@ -1498,6 +1505,7 @@ namespace GnossServicioModuloBASE
         {
             FacetaDS facetaDS = new FacetaDS();
             Guid? ElementoID = null;
+            Guid ElementoOriginalID = Guid.Empty;
             bool tripletasYaAgregadas = pFila["Tipo"].Equals((short)TiposElementosEnCola.InsertadoEnGrafoBusquedaDesdeWeb);
             bool agregarSearch = pFila["Tipo"].Equals((short)TiposElementosEnCola.InsertadoEnGrafoBusquedaDesdeWeb);
             if (!(pFila is BaseRecursosComunidadDS.ColaTagsMyGnossRow))
@@ -1507,9 +1515,10 @@ namespace GnossServicioModuloBASE
 
                 #region Recursos
                 ElementoID = new Guid(listaTagsFiltros[(short)TiposTags.IDTagDoc][0]);
+                ElementoOriginalID = ObtenerDocumentoOriginalID(ElementoID ?? Guid.Empty, entityContext, loggingService, servicesUtilVirtuosoAndReplication, mConfigService);
                 string idRecursoMay = ElementoID.ToString().ToUpper();
                 string idRecursoMin = idRecursoMay.ToLower();
-                listaIdsEliminar.Add(idRecursoMay, "rdf:type");
+                listaIdsEliminar.Add(ElementoOriginalID.ToString(), "rdf:type");
                 DocumentacionCN docCN = new DocumentacionCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
                 string comentarioorecurso = " ";
                 if (listaTagsFiltros[(short)TiposTags.ComentarioORecurso].Count > 0)
@@ -1671,7 +1680,7 @@ namespace GnossServicioModuloBASE
 
                         pDescripcion = actualizacionFacetadoCN.ObtenerDescripcionRecurso(ElementoID.Value);
 
-                        if (pDescripcion != null && !string.IsNullOrEmpty(pDescripcion))
+                        if (!string.IsNullOrEmpty(pDescripcion))
                         {
                             Dictionary<string, string> idiomaDescp = UtilCadenas.ObtenerTextoPorIdiomas(pDescripcion);
 
@@ -2248,6 +2257,16 @@ namespace GnossServicioModuloBASE
 
                 agregarTagsAModeloBase = false;
             }
+
+            if (ElementoOriginalID != Guid.Empty && ElementoOriginalID != ElementoID)
+            {
+                mTripletas.Replace(ElementoID.ToString().ToUpper(), ElementoOriginalID.ToString().ToUpper());
+                mTripletasContribuciones.Replace(ElementoID.ToString().ToUpper(), ElementoOriginalID.ToString().ToUpper());
+                mTripletasGnoss.Replace(ElementoID.ToString().ToUpper(), ElementoOriginalID.ToString().ToUpper());
+                mTripletasPerfilOrganizacion.Replace(ElementoID.ToString().ToUpper(), ElementoOriginalID.ToString().ToUpper());
+                mTripletasPerfilPersonal.Replace(ElementoID.ToString().ToUpper(), ElementoOriginalID.ToString().ToUpper());
+            }
+
             return ElementoID;
         }
 
@@ -4624,6 +4643,21 @@ namespace GnossServicioModuloBASE
                     EnviarCorreoErrorYGuardarLog(cuerpo, "Correo estado modulo base, 24 horas", entityContext, loggingService);
                 }
             }
+        }
+
+        private Guid ObtenerDocumentoOriginalID(Guid pDocumentoID, EntityContext pEntityContext, LoggingService pLoggingService, IServicesUtilVirtuosoAndReplication pServicesUtilVirtuosoAndReplication, ConfigService pConfigService)
+        {
+            DocumentacionAD docAD = new DocumentacionAD(pLoggingService, pEntityContext, pConfigService, pServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionAD>(), mLoggerFactory);
+            DataWrapperDocumentacion dataWrapperDocumentacion = docAD.ObtenerVersionesDocumentoPorID(pDocumentoID);
+
+            VersionDocumento doc = dataWrapperDocumentacion.ListaVersionDocumento.Where(doc => doc.DocumentoID.Equals(pDocumentoID) || doc.DocumentoOriginalID.Equals(pDocumentoID)).FirstOrDefault();
+
+            if (doc != null)
+            {
+                return doc.DocumentoOriginalID;
+            }
+
+            return pDocumentoID;
         }
 
         #endregion
