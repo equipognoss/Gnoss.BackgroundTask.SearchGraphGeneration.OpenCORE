@@ -580,9 +580,7 @@ namespace GnossServicioModuloBASE
 
                     if (pFila is ColaTagsComunidadesRow)
                     {
-                        BaseComunidadCN baseComunidadCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<BaseComunidadCN>(), mLoggerFactory);
-
-                        if (baseComunidadCN.ExisteColaRabbit("ColaTagsComunidadesLinkedData"))
+                        if (availableServices.CheckIfServiceIsAvailable(availableServices.GetBackServiceCode(BackgroundService.LinkedData), ServiceType.Background))
                         {
                             ProyectoCN proyectoCN = new ProyectoCN(mFicheroConfiguracionBD, entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCN>(), mLoggerFactory);
                             Guid proyectoID = ProyectoAD.MetaProyecto;
