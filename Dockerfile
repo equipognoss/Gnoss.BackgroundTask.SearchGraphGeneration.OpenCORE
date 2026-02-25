@@ -9,13 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl
 
 WORKDIR /app
 
-COPY Gnoss.BackgroundTask.SearchGraphGeneration/*.csproj ./
-
-RUN dotnet restore
-
 COPY . ./
 
-RUN dotnet publish Gnoss.BackgroundTask.SearchGraphGeneration/Gnoss.BackgroundTask.SearchGraphGeneration.csproj -c Release -o out
+RUN dotnet restore Gnoss.BackgroundTask.SearchGraphGeneration.OpenCORE/Gnoss.BackgroundTask.SearchGraphGeneration/Gnoss.BackgroundTask.SearchGraphGeneration.csproj
+
+RUN dotnet publish Gnoss.BackgroundTask.SearchGraphGeneration.OpenCORE/Gnoss.BackgroundTask.SearchGraphGeneration/Gnoss.BackgroundTask.SearchGraphGeneration.csproj -c Release -o out
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
