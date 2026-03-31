@@ -154,7 +154,7 @@ namespace GnossServicioModuloBASE
                 }
                 catch(Exception ex)
                 {
-                    GuardarLog(ex, loggingService);
+                    loggingService.GuardarLogError(ex, mLogger);
                     return true;
                 }
                 finally

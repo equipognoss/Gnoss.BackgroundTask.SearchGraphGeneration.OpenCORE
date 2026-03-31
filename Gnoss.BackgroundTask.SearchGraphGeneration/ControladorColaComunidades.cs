@@ -64,7 +64,7 @@ namespace GnossServicioModuloBASE
             }
             catch (Exception ex)
             {
-                GuardarLog(ex, loggingService);
+                loggingService.GuardarLogError(ex, mLogger);
             }
 
             return hayElementosEnCola;
@@ -146,7 +146,7 @@ namespace GnossServicioModuloBASE
                             if (error)
                             {
                                 //Errores con algun elemento de la cola
-                                this.GuardarLog("Ha habido errores en el mantenimiento.", loggingService);
+                                loggingService.GuardarLogError("Ha habido errores en el mantenimiento.", mLogger);
                             }
                         }
                     }
@@ -160,7 +160,7 @@ namespace GnossServicioModuloBASE
                         try
                         {
                             string mensaje = "Excepción: " + ex.ToString() + "\n\n\tTraza: " + ex.StackTrace;
-                            this.GuardarLog(ex, loggingService);
+                            loggingService.GuardarLogError(ex, mLogger);
 
                             string sSource;
                             string sLog;
@@ -199,7 +199,7 @@ namespace GnossServicioModuloBASE
                             }
                             catch (Exception ex)
                             {
-                                GuardarLog(ex, loggingService);
+                                loggingService.GuardarLogError(ex, mLogger);
                             }
                         }
 
@@ -254,7 +254,7 @@ namespace GnossServicioModuloBASE
                         }
                         catch (Exception ex)
                         {
-                            GuardarLog(ex, loggingService);
+                            loggingService.GuardarLogError(ex, mLogger);
                         }
                     }
                 }

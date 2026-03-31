@@ -124,7 +124,7 @@ namespace GnossServicioModuloBASE
                         try
                         {
                             string mensaje = "Excepción: " + ex.ToString() + "\n\n\tTraza: " + ex.StackTrace;
-                            this.GuardarLog(ex, loggingService);
+                            loggingService.GuardarLogError(ex, mLogger);
 
                             string sSource;
                             string sLog;
@@ -200,7 +200,7 @@ namespace GnossServicioModuloBASE
                         }
                         catch (Exception ex)
                         {
-                            GuardarLog(ex, loggingService);
+                            loggingService.GuardarLogError(ex, mLogger);
                         }
                     }
                 }

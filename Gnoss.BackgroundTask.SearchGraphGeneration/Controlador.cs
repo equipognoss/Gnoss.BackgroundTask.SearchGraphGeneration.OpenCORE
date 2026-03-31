@@ -132,7 +132,7 @@ namespace GnossServicioModuloBASE
         protected DateTime siguienteBorrado = DateTime.Now;
 
         private int mSleepSeconds = 0;
-        private ILogger mlogger;
+        private ILogger mLogger;
         private ILoggerFactory mLoggerFactory;
 
 
@@ -153,7 +153,7 @@ namespace GnossServicioModuloBASE
             mEmailErrores = pEmailErrores;
             mHoraEnvioErrores = pHoraEnvioErrores;
             mEscribirFicheroExternoTriples = pEscribirFicheroExternoTriples;
-            mlogger = logger;
+            mLogger = logger;
             mLoggerFactory = loggerFactory;
 
             mSleepSeconds = sleep;
@@ -604,7 +604,7 @@ namespace GnossServicioModuloBASE
                 error = true;
 
                 string mensaje = "Excepci�n: " + exFila.ToString() + "\n\n\tTraza: " + exFila.StackTrace + "\n\nFila: " + pFila["Tags"];
-                loggingService.GuardarLogError("ERROR:  " + mensaje,mlogger);
+                loggingService.GuardarLogError("ERROR:  " + mensaje,mLogger);
 
                 pFila["Estado"] = ((short)pFila["Estado"]) + 1; //Aumento en 1 el error, cuando llegue a 2 no se volver� a intentar
 
@@ -1397,7 +1397,7 @@ namespace GnossServicioModuloBASE
                 }
                 catch (Exception ex)
                 {
-                    GuardarLog(ex, "Error al generar el SEARCH", loggingService);
+                    loggingService.GuardarLogError(ex, "Error al generar el SEARCH", mLogger);
                 }
 
                 pValorSearch = UtilCadenas.EliminarHtmlDeTextoPorEspacios(pValorSearch).Replace("\\", "/");
@@ -1850,13 +1850,13 @@ namespace GnossServicioModuloBASE
                                     if (string.IsNullOrEmpty(urlServicioArchivos))
                                     {
                                         string mensaje = "Excepci�n: el parametro urlServicioArchivos no est� configurado en el config del servicio";
-                                        this.GuardarLog("ERROR:  " + mensaje, loggingService);
+                                        loggingService.GuardarLogError("ERROR:  " + mensaje, mLogger);
                                         throw new Exception(mensaje);
                                     }
                                     else if (!Uri.TryCreate(urlServicioArchivos, UriKind.Absolute, out uriTest))
                                     {
                                         string mensaje = "Excepci�n: el parametro urlServicioArchivos est� mal configurado en el config del servicio: " + urlServicioArchivos;
-                                        this.GuardarLog("ERROR:  " + mensaje, loggingService);
+                                        loggingService.GuardarLogError("ERROR:  " + mensaje, mLogger);
                                         throw new Exception(mensaje);
                                     }
 
@@ -2103,7 +2103,7 @@ namespace GnossServicioModuloBASE
                                             {
                                                 mensaje += $"\r\n UrlServicioArchivos: {filasConfigServicios[0].NumServicio}: {filasConfigServicios[0].Url}";
                                             }
-                                            GuardarLog($"ALERT: {mensaje}", loggingService);
+                                            loggingService.GuardarLogWarning($"ALERT: {mensaje}", mLogger);
                                         }
 
                                         Dictionary<Guid, List<MetaKeyword>> dicOntologiaMetas = new Dictionary<Guid, List<MetaKeyword>>();
@@ -2577,7 +2577,7 @@ namespace GnossServicioModuloBASE
                         }
                         catch (Exception ex)
                         {
-                            loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mlogger);
+                            loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                             baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.PersonasYOrganizaciones);
                         }
                         baseComunidadCN.Dispose();
@@ -3059,7 +3059,7 @@ namespace GnossServicioModuloBASE
                                     }
                                     catch (Exception ex)
                                     {
-                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache",mlogger);
+                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache",mLogger);
                                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.Preguntas);
                                     }
                                     componentesCMSActualizados = true;
@@ -3080,7 +3080,7 @@ namespace GnossServicioModuloBASE
                                     }
                                     catch (Exception ex)
                                     {
-                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache",mlogger);
+                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache",mLogger);
                                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.Debates);
                                     }
 
@@ -3102,7 +3102,7 @@ namespace GnossServicioModuloBASE
                                     }
                                     catch (Exception ex)
                                     {
-                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mlogger);
+                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.Debates);
                                     }
 
@@ -3129,7 +3129,7 @@ namespace GnossServicioModuloBASE
                                     }
                                     catch (Exception ex)
                                     {
-                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mlogger);
+                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.Recursos);
                                     }
                                     componentesCMSActualizados = true;
@@ -3149,7 +3149,7 @@ namespace GnossServicioModuloBASE
                                 }
                                 catch (Exception ex)
                                 {
-                                    loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mlogger);
+                                    loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                                     baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.RefrescarComponentesRecursos, TipoBusqueda.Recursos);
                                 }
                             }
@@ -3218,7 +3218,7 @@ namespace GnossServicioModuloBASE
                             }
                             catch (Exception ex)
                             {
-                                loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mlogger);
+                                loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                                 baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.PersonasYOrganizaciones);
                             }
 
@@ -3554,7 +3554,7 @@ namespace GnossServicioModuloBASE
                     }
                     catch (Exception ex)
                     {
-                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mlogger);
+                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.PersonasYOrganizaciones);
                     }
 
@@ -3626,7 +3626,7 @@ namespace GnossServicioModuloBASE
             }
             catch (Exception ex)
             {
-                pLoggingService.GuardarLogError(ex, $"Error al modificar el nombre de las categor�as en Virtuoso",mlogger);
+                pLoggingService.GuardarLogError(ex, $"Error al modificar el nombre de las categor�as en Virtuoso",mLogger);
             }
         }
         #endregion
