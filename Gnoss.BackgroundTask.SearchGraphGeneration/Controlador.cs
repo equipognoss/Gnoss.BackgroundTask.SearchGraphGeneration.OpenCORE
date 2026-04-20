@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -730,8 +730,7 @@ namespace GnossServicioModuloBASE
             if (pFila.Table.DataSet is BaseRecursosComunidadDS)
             {
                 id = ProcesarFilaDeColaDeTipoAgregadoRecursos(pFila, listaTagsFiltros, ref listaIdsEliminar, ref facetaDW, actualizacionFacetadoCN, proyID, ref valorSearch, ref tags, ref agregarTagsAModeloBase, TieneComponenteConCaducidadTipoRecurso, filaProyecto, organizacionID, listaTablasMantenerConfiguracion, pListaDocsBorradores, listaTags, pTitulo, pDescripcion, pDiccionarioProyectoDocInformacionComunRecurso, ref esDocSemantico, entityContext, loggingService, redisCacheWrapper, entityContextBASE, virtuosoAD, gnossCache, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication, availableServices);
-                idOriginal = ObtenerDocumentoOriginalID(id ?? Guid.Empty, entityContext, loggingService, servicesUtilVirtuosoAndReplication, mConfigService);
-                idOriginal = idOriginal == Guid.Empty ? null : idOriginal;
+                ObtenerDocumentoOriginalYUltimaVersion(id, out _, out idOriginal, entityContext, loggingService, servicesUtilVirtuosoAndReplication, mConfigService);
             }
             else if (pFila.Table.DataSet is BasePerOrgComunidadDS)
             {
@@ -1502,8 +1501,9 @@ namespace GnossServicioModuloBASE
         protected Guid? ProcesarFilaDeColaDeTipoAgregadoRecursos(DataRow pFila, Dictionary<short, List<string>> listaTagsFiltros, ref Dictionary<string, string> listaIdsEliminar, ref DataWrapperFacetas tConfiguracion, ActualizacionFacetadoCN actualizacionFacetadoCN, Guid proyID, ref string valorSearch, ref List<string> tags, ref bool agregarTagsAModeloBase, bool TieneComponenteConCaducidadTipoRecurso, Proyecto filaProyecto, Guid organizacionID, List<string> listaTablasMantenerConfiguracion, Dictionary<Guid, bool> pListaDocsBorradores, List<string> listaTags, string pTitulo, string pDescripcion, Dictionary<Guid, Dictionary<Guid, FacetaDS>> pDiccionarioProyectoDocInformacionComunRecurso, ref bool pEsDocSemantico, EntityContext entityContext, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, EntityContextBASE entityContextBASE, VirtuosoAD virtuosoAD, GnossCache gnossCache, UtilidadesVirtuoso utilidadesVirtuoso, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication, IAvailableServices availableServices)
         {
             FacetaDS facetaDS = new FacetaDS();
+            Guid? filaDocumentoID = null;
             Guid? ElementoID = null;
-            Guid ElementoOriginalID = Guid.Empty;
+            Guid? ElementoOriginalID = Guid.Empty;
             bool tripletasYaAgregadas = pFila["Tipo"].Equals((short)TiposElementosEnCola.InsertadoEnGrafoBusquedaDesdeWeb);
             bool agregarSearch = pFila["Tipo"].Equals((short)TiposElementosEnCola.InsertadoEnGrafoBusquedaDesdeWeb);
             if (!(pFila is BaseRecursosComunidadDS.ColaTagsMyGnossRow))
@@ -1512,8 +1512,8 @@ namespace GnossServicioModuloBASE
                 string urlServicioArchivos = mConfigService.ObtenerUrlServicio("urlArchivos");
 
                 #region Recursos
-                ElementoID = new Guid(listaTagsFiltros[(short)TiposTags.IDTagDoc][0]);
-                ElementoOriginalID = ObtenerDocumentoOriginalID(ElementoID ?? Guid.Empty, entityContext, loggingService, servicesUtilVirtuosoAndReplication, mConfigService);
+                filaDocumentoID = new Guid(listaTagsFiltros[(short)TiposTags.IDTagDoc][0]);
+                ObtenerDocumentoOriginalYUltimaVersion(filaDocumentoID, out ElementoID, out ElementoOriginalID, entityContext, loggingService, servicesUtilVirtuosoAndReplication, mConfigService);
                 string idRecursoMay = ElementoID.ToString().ToUpper();
                 string idRecursoMin = idRecursoMay.ToLower();
                 listaIdsEliminar.Add(ElementoOriginalID.ToString(), "rdf:type");
@@ -2081,7 +2081,7 @@ namespace GnossServicioModuloBASE
                                     if (tipoDoc.Contains("#5#"))
                                     {
                                         pEsDocSemantico = true;
-                                        string triples = ObtenerTriplesFormularioSemantico_ControlCheckPoint(mFicheroConfiguracionBD, mFicheroConfiguracionBDBase, mUrlIntragnoss, tConfiguracion, organizacionID, proyID, ElementoID.Value, out typeSem, loggingService, entityContext, redisCacheWrapper, gnossCache, entityContextBASE, virtuosoAD, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
+                                        string triples = ObtenerTriplesFormularioSemantico_ControlCheckPoint(mFicheroConfiguracionBD, mFicheroConfiguracionBDBase, mUrlIntragnoss, tConfiguracion, organizacionID, proyID, ElementoOriginalID.Value, out typeSem, loggingService, entityContext, redisCacheWrapper, gnossCache, entityContextBASE, virtuosoAD, utilidadesVirtuoso, servicesUtilVirtuosoAndReplication);
                                         if (!tripletasYaAgregadas)
                                         {
                                             mTripletas.Append(triples);
@@ -4643,19 +4643,24 @@ namespace GnossServicioModuloBASE
             }
         }
 
-        private Guid ObtenerDocumentoOriginalID(Guid pDocumentoID, EntityContext pEntityContext, LoggingService pLoggingService, IServicesUtilVirtuosoAndReplication pServicesUtilVirtuosoAndReplication, ConfigService pConfigService)
+        private void ObtenerDocumentoOriginalYUltimaVersion(Guid? pDocumentoID, out Guid? pDocumentoIDOriginal, out Guid? pDocumentoUltimaVersionID, EntityContext pEntityContext, LoggingService pLoggingService, IServicesUtilVirtuosoAndReplication pServicesUtilVirtuosoAndReplication, ConfigService pConfigService)
         {
-            DocumentacionAD docAD = new DocumentacionAD(pLoggingService, pEntityContext, pConfigService, pServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionAD>(), mLoggerFactory);
-            DataWrapperDocumentacion dataWrapperDocumentacion = docAD.ObtenerVersionesDocumentoPorID(pDocumentoID);
+            DocumentacionCN docCN = new DocumentacionCN(pEntityContext, pLoggingService, pConfigService, pServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
 
-            VersionDocumento doc = dataWrapperDocumentacion.ListaVersionDocumento.Where(doc => doc.DocumentoID.Equals(pDocumentoID) || doc.DocumentoOriginalID.Equals(pDocumentoID)).FirstOrDefault();
+            DataWrapperDocumentacion dataWrapperDocumentacion = docCN.ObtenerVersionesDocumentoPorID(pDocumentoID.Value);
+
+            VersionDocumento doc = dataWrapperDocumentacion.ListaVersionDocumento.OrderByDescending(doc => doc.Version).FirstOrDefault();
 
             if (doc != null)
             {
-                return doc.DocumentoOriginalID;
+                pDocumentoIDOriginal = doc.DocumentoOriginalID;
+                pDocumentoUltimaVersionID = doc.DocumentoID;
             }
-
-            return pDocumentoID;
+            else
+            {
+                pDocumentoIDOriginal = pDocumentoID;
+                pDocumentoUltimaVersionID = pDocumentoID;
+            }
         }
 
         #endregion
