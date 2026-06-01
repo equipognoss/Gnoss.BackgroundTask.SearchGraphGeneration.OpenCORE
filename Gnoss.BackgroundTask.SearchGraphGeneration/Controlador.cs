@@ -258,10 +258,10 @@ namespace GnossServicioModuloBASE
             DocumentacionCN docCN = new DocumentacionCN(entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
             List<Guid> listaDocsID = new List<Guid>();
             listaDocsID.Add(pDocumentoID);
-            List<Es.Riam.Gnoss.AD.EntityModel.Models.Documentacion.DocumentoWebAgCatTesauroConVinculoTesauroID> listaDocumentoWebAgCatTesauroConVinculoTesauroID = docCN.ObtenerCategoriasTesauroYTesauroDeDocumentos(listaDocsID);
+            List<DocumentoWebAgCatTesauroConVinculoTesauroID> listaDocumentoWebAgCatTesauroConVinculoTesauroID = docCN.ObtenerCategoriasTesauroYTesauroDeDocumentos(listaDocsID);
+            
+            string tripletas = CrearTripletasCategoriasElemento(docCN.ObtenerDocumentoOriginalIDPorID(pDocumentoID), listaDocumentoWebAgCatTesauroConVinculoTesauroID, pProyectoID, ref pNumeroTripletas, ref pCampoSearch, entityContext, loggingService, redisCacheWrapper, servicesUtilVirtuosoAndReplication);
             docCN.Dispose();
-
-            string tripletas = CrearTripletasCategoriasElemento(pDocumentoID, listaDocumentoWebAgCatTesauroConVinculoTesauroID, pProyectoID, ref pNumeroTripletas, ref pCampoSearch, entityContext, loggingService, redisCacheWrapper, servicesUtilVirtuosoAndReplication);
             return tripletas;
         }
 
@@ -382,13 +382,13 @@ namespace GnossServicioModuloBASE
             return texto;
         }
 
-        protected string CrearTripletasCategoriasElemento(Guid pElementoID, List<Es.Riam.Gnoss.AD.EntityModel.Models.Documentacion.DocumentoWebAgCatTesauroConVinculoTesauroID> pFilasRelacionCategoria, Guid pProyectoTesauroID, ref string pCampoSearch, EntityContext entityContext, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        protected string CrearTripletasCategoriasElemento(Guid pElementoID, List<DocumentoWebAgCatTesauroConVinculoTesauroID> pFilasRelacionCategoria, Guid pProyectoTesauroID, ref string pCampoSearch, EntityContext entityContext, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
         {
             int num = 0;
             return CrearTripletasCategoriasElemento(pElementoID, pFilasRelacionCategoria, pProyectoTesauroID, ref num, ref pCampoSearch, entityContext, loggingService, redisCacheWrapper, servicesUtilVirtuosoAndReplication);
         }
 
-        protected string CrearTripletasCategoriasElemento(Guid pElementoID, List<Es.Riam.Gnoss.AD.EntityModel.Models.Documentacion.DocumentoWebAgCatTesauroConVinculoTesauroID> pFilasRelacionCategoria, Guid pProyectoTesauroID, ref int pNumeroTripletas, ref string pCampoSearch, EntityContext entityContext, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        protected string CrearTripletasCategoriasElemento(Guid pElementoID, List<DocumentoWebAgCatTesauroConVinculoTesauroID> pFilasRelacionCategoria, Guid pProyectoTesauroID, ref int pNumeroTripletas, ref string pCampoSearch, EntityContext entityContext, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
         {
             //Obtener tesauro
             TesauroCL tesCL = new TesauroCL(mFicheroConfiguracionBD, entityContext, loggingService, redisCacheWrapper, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<TesauroCL>(), mLoggerFactory);
@@ -428,7 +428,7 @@ namespace GnossServicioModuloBASE
             }
 
             StringBuilder texto = new StringBuilder();
-            string sujeto = $"<http://gnoss/{pElementoID}>";
+            string sujeto = $"<http://gnoss/{pElementoID.ToString().ToUpper()}>";
             string predicado = "<http://www.w3.org/2004/02/skos/core#ConceptID>";
 
             foreach (Guid categoriaID in categoriasAgregadas.Where(item => gestorTesauro.ListaCategoriasTesauro.ContainsKey(item)))
@@ -4643,7 +4643,7 @@ namespace GnossServicioModuloBASE
             }
         }
 
-        private void ObtenerDocumentoOriginalYUltimaVersion(Guid? pDocumentoID, out Guid? pDocumentoIDOriginal, out Guid? pDocumentoUltimaVersionID, EntityContext pEntityContext, LoggingService pLoggingService, IServicesUtilVirtuosoAndReplication pServicesUtilVirtuosoAndReplication, ConfigService pConfigService)
+        private void ObtenerDocumentoOriginalYUltimaVersion(Guid? pDocumentoID, out Guid? pDocumentoUltimaVersionID, out Guid? pDocumentoIDOriginal, EntityContext pEntityContext, LoggingService pLoggingService, IServicesUtilVirtuosoAndReplication pServicesUtilVirtuosoAndReplication, ConfigService pConfigService)
         {
             DocumentacionCN docCN = new DocumentacionCN(pEntityContext, pLoggingService, pConfigService, pServicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<DocumentacionCN>(), mLoggerFactory);
 
