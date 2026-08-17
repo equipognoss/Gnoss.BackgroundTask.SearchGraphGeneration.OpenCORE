@@ -3545,7 +3545,7 @@ namespace GnossServicioModuloBASE
             #region borramos cache recursos (y RSS)
             if ((short)pFila["Prioridad"] < 11 || (short)pFila["Prioridad"] > 20)
             {
-                if (numeroRecursos > 3000/* && proyID.Equals(ProyectoAD.ProyectoDidactalia)*/)
+                if (numeroRecursos > 3000)
                 {
                     BaseComunidadCN baseComunidadCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<BaseComunidadCN>(), mLoggerFactory);
                     try
