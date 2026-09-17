@@ -53,20 +53,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Es.Riam.Gnoss.Util.Configuracion;
 using Es.Riam.Gnoss.CL;
 using Es.Riam.Gnoss.UtilServiciosWeb;
-using Newtonsoft.Json;
 using Es.Riam.Gnoss.AD.Tags;
 using Es.Riam.Gnoss.AD.EntityModel.Models.BASE;
 using Es.Riam.AbstractsOpen;
 using Es.Riam.Gnoss.Util.Seguridad;
 using Es.Riam.Gnoss.AD.TareasSegundoPlano;
-using Universal.Common.Extensions;
 using static Es.Riam.Gnoss.AD.BASE_BD.Model.BaseRecursosComunidadDS;
-using System.Security.Cryptography;
 using Es.Riam.Interfaces.InterfacesOpen;
 using Es.Riam.Gnoss.AD.EntityModel.Models.Documentacion;
 using Microsoft.Extensions.Logging;
-using Es.Riam.Gnoss.Elementos.Suscripcion;
-using Es.Riam.Gnoss.CL.ParametrosProyecto;
+using System.Text.Json;
 
 namespace GnossServicioModuloBASE
 {
@@ -131,9 +127,9 @@ namespace GnossServicioModuloBASE
         protected DateTime utimaEjecucion = DateTime.Now;
         protected DateTime siguienteBorrado = DateTime.Now;
 
-        private int mSleepSeconds = 0;
-        private ILogger mLogger;
-        private ILoggerFactory mLoggerFactory;
+        private readonly int mSleepSeconds = 0;
+        private readonly ILogger mLogger;
+        private readonly ILoggerFactory mLoggerFactory;
 
 
         #endregion
@@ -145,7 +141,7 @@ namespace GnossServicioModuloBASE
         /// </summary>
         /// <param name="pFicheroConfiguracionBD">Fichero de configuraci�n de la base de datos</param>
         public Controlador(bool pReplicacion, string pRutaBaseTriplesDescarga, string pUrlTriplesDescarga, string pEmailErrores, int pHoraEnvioErrores, bool pEscribirFicheroExternoTriples, IServiceScopeFactory serviceScopeFactory, ConfigService configService, ILogger<Controlador> logger, ILoggerFactory loggerFactory, int sleep = 0)
-            : base(serviceScopeFactory, configService,logger,loggerFactory)
+            : base(serviceScopeFactory, configService, logger, loggerFactory)
         {
             mReplicacion = pReplicacion;
             mRutaBaseTriplesDescarga = pRutaBaseTriplesDescarga;
@@ -168,7 +164,7 @@ namespace GnossServicioModuloBASE
         /// <summary>
         /// Realiza el mantenimiento del m�dulo BASE
         /// </summary>
-        public override void RealizarMantenimiento(EntityContext entityContext, EntityContextBASE entityContextBASE, UtilidadesVirtuoso utilidadesVirtuoso, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, GnossCache gnossCache, VirtuosoAD virtuosoAD, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
+        public override void RealizarMantenimiento(EntityContext entityContext, EntityContextBASE entityContextBASE, UtilidadesVirtuoso utilidadesVirtuoso, LoggingService loggingService, RedisCacheWrapper redisCacheWrapper, GnossCache gnossCache, IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication)
         {
             Thread.Sleep(mSleepSeconds * 1000);
 
@@ -178,7 +174,7 @@ namespace GnossServicioModuloBASE
             mUrlIntragnoss = gestorParametroAplicacion.ParametroAplicacion.Find(parametroApp => parametroApp.Parametro.Equals("UrlIntragnoss")).Valor;
 
             FacetaCN facetaCN = new FacetaCN(entityContext, loggingService, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetaCN>(), mLoggerFactory);
-            FacetadoAD facetadoAD = new FacetadoAD(mUrlIntragnoss, loggingService, entityContext, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoAD>(), mLoggerFactory);
+            FacetadoAD facetadoAD = new FacetadoAD(mUrlIntragnoss, loggingService, entityContext, mConfigService, null, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<FacetadoAD>(), mLoggerFactory);
             facetaCN.CargarConfiguracionConexionGrafo(facetadoAD.ServidoresGrafo);
             facetaCN.Dispose();
 
@@ -202,8 +198,6 @@ namespace GnossServicioModuloBASE
             #endregion
 
             RealizarMantenimientoRabbitMQ(loggingService);
-
-            //RealizarMantenimientoBaseDatosColas();
 
         }
 
@@ -510,7 +504,7 @@ namespace GnossServicioModuloBASE
                         proyCL.InicializarContadorTarea(new Guid((string)pFila["IdentificadorTarea"]));
                         tareasAD.ActualizarEstado(new Guid((string)pFila["IdentificadorTarea"]), EstadoTarea.EnProceso);
                     }
-                    else if (pFila["IdentificadorTarea"] != System.DBNull.Value && !pFila["IdentificadorTarea"].ToString().IsNullOrEmpty())
+                    else if (pFila["IdentificadorTarea"] != System.DBNull.Value && !string.IsNullOrEmpty(pFila["IdentificadorTarea"].ToString()))
                     {
                         string tareaId = (string)pFila["IdentificadorTarea"];
                         ProyectoCL proyCL = new ProyectoCL(entityContext, loggingService, redisCacheWrapper, mConfigService, virtuosoAD, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<ProyectoCL>(), mLoggerFactory);
@@ -604,7 +598,7 @@ namespace GnossServicioModuloBASE
                 error = true;
 
                 string mensaje = "Excepci�n: " + exFila.ToString() + "\n\n\tTraza: " + exFila.StackTrace + "\n\nFila: " + pFila["Tags"];
-                loggingService.GuardarLogError("ERROR:  " + mensaje,mLogger);
+                loggingService.GuardarLogError("ERROR:  " + mensaje, mLogger);
 
                 pFila["Estado"] = ((short)pFila["Estado"]) + 1; //Aumento en 1 el error, cuando llegue a 2 no se volver� a intentar
 
@@ -1348,9 +1342,9 @@ namespace GnossServicioModuloBASE
 
                     if (availableServices.CheckIfServiceIsAvailable(availableServices.GetBackServiceCode(BackgroundService.AutomaticSharing), ServiceType.Background))
                     {
-						BaseComunidadCN baseComunidadCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<BaseComunidadCN>(), mLoggerFactory);
-						baseComunidadCN.ActualizarBD(baseComunidadDS);
-					}                  
+                        BaseComunidadCN baseComunidadCN = new BaseComunidadCN(mFicheroConfiguracionBDBase, entityContext, loggingService, entityContextBASE, mConfigService, servicesUtilVirtuosoAndReplication, mLoggerFactory.CreateLogger<BaseComunidadCN>(), mLoggerFactory);
+                        baseComunidadCN.ActualizarBD(baseComunidadDS);
+                    }
                 }
             }
         }
@@ -2107,6 +2101,7 @@ namespace GnossServicioModuloBASE
                                         }
 
                                         Dictionary<Guid, List<MetaKeyword>> dicOntologiaMetas = new Dictionary<Guid, List<MetaKeyword>>();
+                                        Dictionary<Guid, List<MetaKeyword>> dicOntologiaMetas2 = new Dictionary<Guid, List<MetaKeyword>>();
 
                                         //se cargan las metaetiquetas del xml de la ontolog�a al campo search
                                         if (!string.IsNullOrEmpty(urlServicioArchivos) && uriValida)
@@ -2116,7 +2111,7 @@ namespace GnossServicioModuloBASE
                                                 CallTokenService callTokenService = new CallTokenService(mConfigService);
                                                 TokenBearer token = callTokenService.CallTokenApi();
                                                 string result = CallWebMethods.CallGetApiToken(urlServicioArchivos, $"ObtenerXmlOntologia?pOntologiaID={filaDocumento.ElementoVinculadoID.Value}", token);
-                                                byte[] byteArray = JsonConvert.DeserializeObject<byte[]>(result);
+                                                byte[] byteArray = JsonSerializer.Deserialize<byte[]>(result);
 
                                                 if (byteArray != null)
                                                 {
@@ -2246,7 +2241,7 @@ namespace GnossServicioModuloBASE
                                 docCL.Dispose();
                             }
                         }
-                        
+
                         baseComunidadCN.InsertarFilasColaRefrescoCacheEnRabbitMQ(filasAInsertar, TiposEventosRefrescoCache.BusquedaVirtuoso);
                         baseComunidadCN.Dispose();
                     }
@@ -3059,7 +3054,7 @@ namespace GnossServicioModuloBASE
                                     }
                                     catch (Exception ex)
                                     {
-                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache",mLogger);
+                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.Preguntas);
                                     }
                                     componentesCMSActualizados = true;
@@ -3080,7 +3075,7 @@ namespace GnossServicioModuloBASE
                                     }
                                     catch (Exception ex)
                                     {
-                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache",mLogger);
+                                        loggingService.GuardarLogError(ex, "Fallo al insertar en Rabbit, insertamos en la base de datos BASE, tabla colaRefrescoCache", mLogger);
                                         baseComunidadCN.InsertarFilaEnColaRefrescoCache(proyID, TiposEventosRefrescoCache.BusquedaVirtuoso, TipoBusqueda.Debates);
                                     }
 
@@ -3626,7 +3621,7 @@ namespace GnossServicioModuloBASE
             }
             catch (Exception ex)
             {
-                pLoggingService.GuardarLogError(ex, $"Error al modificar el nombre de las categor�as en Virtuoso",mLogger);
+                pLoggingService.GuardarLogError(ex, $"Error al modificar el nombre de las categor�as en Virtuoso", mLogger);
             }
         }
         #endregion

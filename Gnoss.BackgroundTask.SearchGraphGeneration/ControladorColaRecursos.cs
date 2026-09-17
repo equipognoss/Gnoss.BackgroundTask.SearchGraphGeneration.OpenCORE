@@ -45,6 +45,7 @@ namespace GnossServicioModuloBASE
     {
         private ILogger mlogger;
         private ILoggerFactory mLoggerFactory;
+        private RabbitMQClient mRabbitMQClient;
         #region Constantes
 
         private const string COLA_TAGS_COMUNIDADES = "ColaTagsComunidades";
@@ -77,18 +78,19 @@ namespace GnossServicioModuloBASE
                 RabbitMQClient.ReceivedDelegate funcionProcesarItem = new RabbitMQClient.ReceivedDelegate(ProcesarItem);
                 RabbitMQClient.ShutDownDelegate funcionShutDown = new RabbitMQClient.ShutDownDelegate(OnShutDown);
 
-                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, COLA_TAGS_COMUNIDADES,loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, EXCHANGE, COLA_TAGS_COMUNIDADES);
+                mRabbitMQClient?.Dispose();
+                mRabbitMQClient = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, COLA_TAGS_COMUNIDADES,loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, EXCHANGE, COLA_TAGS_COMUNIDADES);
 
                 try
                 {
-                    rMQ.ObtenerElementosDeCola(funcionProcesarItem, funcionShutDown);
+                    mRabbitMQClient.ObtenerElementosDeCola(funcionProcesarItem, funcionShutDown);
                 }
                 catch (Exception ex)
                 {
                     if (reintentar)
                     {
                         //Puede que la cola no este creada, la creamos con un elemento vacio
-                        rMQ.AgregarElementoACola("");
+                        mRabbitMQClient.AgregarElementoACola("");
 
                         RealizarMantenimientoRabbitMQ(loggingService, false);
                     }

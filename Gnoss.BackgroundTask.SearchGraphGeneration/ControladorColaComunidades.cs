@@ -28,8 +28,9 @@ namespace GnossServicioModuloBASE
     {
         private ILogger mlogger;
         private ILoggerFactory mLoggerFactory;
+        private RabbitMQClient mRabbitMQClient;
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="pFicheroConfiguracionBD"></param>
         /// <param name="pReplicacion"></param>
@@ -78,18 +79,19 @@ namespace GnossServicioModuloBASE
                 RabbitMQClient.ReceivedDelegate funcionProcesarItem = new RabbitMQClient.ReceivedDelegate(ProcesarItem);
                 RabbitMQClient.ShutDownDelegate funcionShutDown = new RabbitMQClient.ShutDownDelegate(OnShutDown);
 
-                RabbitMQClient rMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsProyectos",loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, "", "ColaTagsProyectos");
+                mRabbitMQClient?.Dispose();
+                mRabbitMQClient = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, "ColaTagsProyectos",loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, "", "ColaTagsProyectos");
 
                 try
                 {
-                    rMQ.ObtenerElementosDeCola(funcionProcesarItem, funcionShutDown);
+                    mRabbitMQClient.ObtenerElementosDeCola(funcionProcesarItem, funcionShutDown);
                 }
                 catch (Exception ex)
                 {
                     if (reintentar)
                     {
                         //Puede que la cola no este creada, la creamos con un elemento vacio
-                        rMQ.AgregarElementoACola("");
+                        mRabbitMQClient.AgregarElementoACola("");
 
                         RealizarMantenimientoRabbitMQ(loggingService, false);
                     }
@@ -120,12 +122,6 @@ namespace GnossServicioModuloBASE
                     GnossCache gnossCache = scope.ServiceProvider.GetRequiredService<GnossCache>();
                     IServicesUtilVirtuosoAndReplication servicesUtilVirtuosoAndReplication = scope.ServiceProvider.GetRequiredService<IServicesUtilVirtuosoAndReplication>();
                     IAvailableServices availableServices = scope.ServiceProvider.GetRequiredService<IAvailableServices>();
-                    if (mReiniciarCola)
-                    {
-                        RealizarMantenimientoRabbitMQ(loggingService);
-                        mReiniciarCola = false;
-                    }
-
                     ComprobarCancelacionHilo();
                     EstaHiloActivo = true;
 
