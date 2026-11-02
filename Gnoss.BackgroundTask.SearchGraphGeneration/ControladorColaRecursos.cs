@@ -142,7 +142,10 @@ namespace GnossServicioModuloBASE
                         {
                             error = ProcesarFilasDeColaDeRecursos((BaseRecursosComunidadDS)filaCola.Table.DataSet, entityContext, loggingService, entityContextBASE, virtuosoAD, redisCacheWrapper, utilidadesVirtuoso, gnossCache, servicesUtilVirtuosoAndReplication, availableServices, true);
 
-                            if (!error)
+                            //Las filas de inicio y fin de tarea solo gestionan el estado de la tarea, que ya se ha actualizado en este servicio
+                            bool isTaskControlRow = filaCola.Tipo == (short)TiposElementosEnCola.InicioTarea || filaCola.Tipo == (short)TiposElementosEnCola.FinTarea;
+
+                            if (!error && !isTaskControlRow)
                             {
 
                                 InsertarColaTagsComunidades(filaCola, loggingService, availableServices);
@@ -198,8 +201,12 @@ namespace GnossServicioModuloBASE
             
             if (mConfigService.ExistRabbitConnection(RabbitMQClient.BD_SERVICIOS_WIN) && availableServices.CheckIfServiceIsAvailable(availableServices.GetBackServiceCode(BackgroundService.AutocompleteGenerator), ServiceType.Background))
             {
+                //Se quita el identificador de tarea para que el generador de autocompletar no vuelva a incrementar el contador de la tarea
+                object[] itemArray = pFilaCola.ItemArray;
+                itemArray[pFilaCola.Table.Columns["IdentificadorTarea"].Ordinal] = string.Empty;
+
                 RabbitMQClient rabbitMQ = new RabbitMQClient(RabbitMQClient.BD_SERVICIOS_WIN, colaRabbit, loggingService, mConfigService, mLoggerFactory.CreateLogger<RabbitMQClient>(), mLoggerFactory, exchange, colaRabbit);
-                rabbitMQ.AgregarElementoACola(JsonConvert.SerializeObject(pFilaCola.ItemArray));
+                rabbitMQ.AgregarElementoACola(JsonConvert.SerializeObject(itemArray));
                 rabbitMQ.Dispose();
             }
         }
